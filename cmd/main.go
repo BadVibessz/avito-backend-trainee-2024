@@ -3,10 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/sirupsen/logrus"
+
 	httpSwagger "github.com/swaggo/http-swagger"
-	"net/http"
 )
 
 func main() {
