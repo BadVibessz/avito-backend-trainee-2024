@@ -11,5 +11,5 @@ CREATE TABLE tag
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP TABLE tag;
 -- +goose StatementEnd

@@ -1,39 +1,81 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
-
-	"github.com/go-chi/chi/v5"
+	"avito-backend-trainee-2024/internal/domain/entity"
+	"avito-backend-trainee-2024/internal/repository/postgres"
+	"context"
+	"database/sql"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
-
-	httpSwagger "github.com/swaggo/http-swagger"
+	"math"
 )
 
 func main() {
 	logger := logrus.New()
-	port := 5000
+	ctx := context.Background()
 
-	r := chi.NewRouter()
+	//port := 5000
+	//
+	//r := chi.NewRouter()
+	//
+	//server := http.Server{
+	//	Addr:    fmt.Sprintf(":%v", port),
+	//	Handler: r,
+	//}
+	//
+	//// add swagger middleware
+	//r.Get("/swagger/*", httpSwagger.Handler(
+	//	httpSwagger.URL(fmt.Sprintf("http://localhost:%v/swagger/doc.json", port)), // The url pointing to API definition
+	//))
+	//
+	//logger.Infof("server started at port %v", server.Addr)
+	//
+	//go func() {
+	//	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	//		logger.WithError(err).Fatalf("server can't listen requests")
+	//	}
+	//}()
+	//
+	//logger.Infof("documentation available on: http://localhost:%v/swagger/index.html", port)
 
-	server := http.Server{
-		Addr:    fmt.Sprintf(":%v", port),
-		Handler: r,
+	// todo: config
+	connStr := "postgresql://postgres:postgres@localhost:5432/avito-trainee?sslmode=disable"
+
+	conn, err := sql.Open("pgx", connStr)
+	if err != nil {
+		logger.Fatalf("cannot open database connection with connection string: %v, err: %v", connStr, err)
 	}
 
-	// add swagger middleware
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL(fmt.Sprintf("http://localhost:%v/swagger/doc.json", port)), // The url pointing to API definition
-	))
+	db := sqlx.NewDb(conn, "postgres")
 
-	logger.Infof("server started at port %v", server.Addr)
+	bannerRepo := postgres.NewBannerRepo(db)
 
-	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.WithError(err).Fatalf("server can't listen requests")
+	banners, err := bannerRepo.GetAllBanners(ctx, 0, math.MaxInt64)
+	if err != nil {
+		logger.Fatalf("error occurred fetching banners from db: %v", err)
+	}
+
+	logger.Infof("banners: %+v", banners)
+
+	banner := entity.Banner{
+		Name:      "test_banner",
+		TagIDs:    []int{1, 2},
+		FeatureID: 1,
+		Content: entity.Content{
+			Title: "test_content",
+			Text:  "some_text",
+			Url:   "google.com",
+		},
+		IsActive: true,
+	}
+
+	createdBanner, err := bannerRepo.CreateBanner(ctx, banner)
+	if err != nil {
+		if err != nil {
+			logger.Fatalf("error occurred creating banner: %v", err)
 		}
-	}()
+	}
 
-	logger.Infof("documentation available on: http://localhost:%v/swagger/index.html", port)
+	logger.Infof("created banner: %+v", createdBanner)
 }

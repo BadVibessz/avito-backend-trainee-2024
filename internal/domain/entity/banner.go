@@ -2,13 +2,14 @@ package entity
 
 import "time"
 
-type Banner struct { // TODO: CHANGE POSTGRES BANNER SCHEMA
-	ID        int
-	Name      string
-	TagIDs    []int
-	FeatureID int
-	CreatedAt time.Time
-	UpdatedAt time.Time
+type Banner struct {
+	ID        int       `db:"id"`
+	Name      string    `db:"name"`
+	TagIDs    []int     `db:"tag_ids"`
+	FeatureID int       `db:"feature_id"`
+	Content   Content   `db:"content"`
+	IsActive  bool      `db:"is_active"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+	Row       any       `db:"row"`
 }
-
-// TODO: сделать как массив или как one-to-many?
