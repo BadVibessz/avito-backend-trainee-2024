@@ -3,7 +3,7 @@
 CREATE TABLE banner_tag
 (
     id        bigserial not null primary key,
-    banner_id integer   not null references banner,
+    banner_id integer   not null references banner on delete cascade,
     tag_id    integer   not null references tag
 );
 -- +goose StatementEnd

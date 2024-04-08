@@ -51,17 +51,10 @@ func main() {
 
 	bannerRepo := postgres.NewBannerRepo(db)
 
-	banners, err := bannerRepo.GetAllBanners(ctx, 0, math.MaxInt64)
-	if err != nil {
-		logger.Fatalf("error occurred fetching banners from db: %v", err)
-	}
-
-	logger.Infof("banners: %+v", banners)
-
 	banner := entity.Banner{
 		Name:      "test_banner",
-		TagIDs:    []int{1, 2},
-		FeatureID: 1,
+		TagIDs:    []int{5, 6},
+		FeatureID: 5,
 		Content: entity.Content{
 			Title: "test_content",
 			Text:  "some_text",
@@ -78,4 +71,28 @@ func main() {
 	}
 
 	logger.Infof("created banner: %+v", createdBanner)
+
+	banners, err := bannerRepo.GetAllBanners(ctx, 0, math.MaxInt64)
+	if err != nil {
+		logger.Fatalf("error occurred fetching banners from db: %v", err)
+	}
+
+	for _, banner := range banners {
+		logger.Infof("banner: %+v", banner)
+	}
+
+	got, err := bannerRepo.GetBannerByFeatureAndTags(ctx, createdBanner.FeatureID, createdBanner.TagIDs)
+	if err != nil {
+		logger.Fatalf("error occurred fetching banner from db: %v", err)
+	}
+
+	logger.Infof("banner found: %+v", got)
+
+	deleted, err := bannerRepo.DeleteBanner(ctx, createdBanner.ID)
+	if err != nil {
+		logger.Fatalf("error occurred deleting banners from db: %v", err)
+	}
+
+	logger.Infof("deleted: %+v", deleted)
+
 }

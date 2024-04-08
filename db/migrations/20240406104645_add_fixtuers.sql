@@ -11,5 +11,6 @@ INSERT INTO feature (name) VALUES ('feature_test_name2');
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+TRUNCATE TABLE tag CASCADE;
+TRUNCATE TABLE feature CASCADE;
 -- +goose StatementEnd

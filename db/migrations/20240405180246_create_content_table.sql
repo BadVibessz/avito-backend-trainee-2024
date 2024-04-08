@@ -2,7 +2,7 @@
 -- +goose StatementBegin
 CREATE TABLE content
 (
-    id    bigserial not null primary key,
+    content_id    bigserial not null primary key,
     title text      not null,
     text  text      not null,
     url   text      not null
