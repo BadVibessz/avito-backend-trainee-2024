@@ -2,7 +2,7 @@ package main
 
 import (
 	"avito-backend-trainee-2024/internal/domain/entity"
-	"avito-backend-trainee-2024/internal/repository/postgres"
+	"avito-backend-trainee-2024/internal/repository/postgres/banner"
 	"context"
 	"database/sql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -49,7 +49,7 @@ func main() {
 
 	db := sqlx.NewDb(conn, "postgres")
 
-	bannerRepo := postgres.NewBannerRepo(db)
+	bannerRepo := banner.New(db)
 
 	banner := entity.Banner{
 		Name:      "test_banner",
@@ -81,7 +81,23 @@ func main() {
 		logger.Infof("banner: %+v", banner)
 	}
 
-	got, err := bannerRepo.GetBannerByFeatureAndTags(ctx, createdBanner.FeatureID, createdBanner.TagIDs)
+	updateModel := entity.Banner{
+		TagIDs:    []int{6},
+		FeatureID: 6,
+		Content: entity.Content{
+			Title: "new_title",
+			Text:  "new_text",
+			Url:   "new_url",
+		},
+		IsActive: true,
+	}
+
+	err = bannerRepo.UpdateBanner(ctx, createdBanner.ID, updateModel)
+	if err != nil {
+		logger.Fatalf("error occurred updating banner: %v", err)
+	}
+
+	got, err := bannerRepo.GetBannerByFeatureAndTags(ctx, updateModel.FeatureID, updateModel.TagIDs)
 	if err != nil {
 		logger.Fatalf("error occurred fetching banner from db: %v", err)
 	}

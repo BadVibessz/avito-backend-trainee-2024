@@ -1,4 +1,4 @@
-package postgres
+package banner
 
 import (
 	"context"
@@ -6,24 +6,23 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"math"
+	"strconv"
 
 	"avito-backend-trainee-2024/internal/domain/entity"
-
-	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 )
 
-type BannerRepo struct {
+type Repo struct {
 	DB *sqlx.DB
 }
 
-func NewBannerRepo(db *sqlx.DB) *BannerRepo {
-	return &BannerRepo{
+func New(db *sqlx.DB) *Repo {
+	return &Repo{
 		DB: db,
 	}
 }
 
 // general method for fetching banners with where condition
-func (br *BannerRepo) getBannersWhere(ctx context.Context, condition string, offset, limit int) ([]*entity.Banner, error) {
+func (r *Repo) getBannersWhere(ctx context.Context, condition string, offset, limit int) ([]*entity.Banner, error) {
 	var query string
 
 	// TODO: maybe without join but two sql queries?
@@ -39,7 +38,7 @@ ORDER BY banner.feature_id LIMIT %V OFFSET %v`, condition, limit, offset)
 	}
 
 	// execute in transaction
-	tx, err := br.DB.BeginTxx(ctx, &sql.TxOptions{})
+	tx, err := r.DB.BeginTxx(ctx, &sql.TxOptions{})
 
 	defer tx.Rollback()
 
@@ -113,28 +112,72 @@ ORDER BY banner.feature_id LIMIT %V OFFSET %v`, condition, limit, offset)
 	return banners, nil
 }
 
-func (br *BannerRepo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
-	return br.getBannersWhere(ctx, "", offset, limit)
+func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
+	return r.getBannersWhere(ctx, "", offset, limit)
 }
 
-func (br *BannerRepo) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
-	banners, err := br.getBannersWhere(ctx, fmt.Sprintf("WHERE banner.feature_id = %v", featureID), 0, math.MaxInt64)
+/*
+GetBannerByFeatureAndTags
+
+	TODO: this method can take long time,
+		openapi.yaml spec says that we need to return only banner.Content to user,
+		so there's no need to return from db banner model with all initialized fields
+*/
+func (r *Repo) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
+	//banners, err := r.getBannersWhere(ctx, fmt.Sprintf("WHERE banner.feature_id = %v", featureID), 0, math.MaxInt64)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//for _, banner := range banners {
+	//	if sliceutils.Equals(banner.TagIDs, tagIDs) {
+	//		return banner, nil
+	//	}
+	//}
+	//
+	//return nil, ErrNoSuchBanner
+
+	IDsStr := ""
+
+	for i, id := range tagIDs {
+		IDsStr += strconv.Itoa(id)
+
+		if i != len(tagIDs)-1 {
+			IDsStr += ","
+		}
+	}
+
+	query := fmt.Sprintf(`SELECT banner.id,
+       is_active,
+       title,
+       text,
+       url,
+       array_agg(bt.tag_id ORDER BY bt.tag_id) AS tag_ids
+FROM banner
+         JOIN public.content c ON c.content_id = banner.content_id
+         JOIN public.banner_tag bt ON banner.id = bt.banner_id
+WHERE feature_id = %v
+GROUP BY banner.id, c.content_id
+`, featureID)
+	// TODO:
+	rows, err := r.DB.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, banner := range banners {
-		if sliceutils.Equals(banner.TagIDs, tagIDs) {
-			return banner, nil
-		}
+	type Row struct {
+		IsActive bool   `db:"is_active"`
+		Title    string `db:"title"`
+		Text     string `db:"text"`
+		Url      string `db:"url"`
+		TagIDs   []int  `db:"tag_ids"`
 	}
 
-	return nil, ErrNoSuchBanner
 }
 
-func (br *BannerRepo) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error) {
+func (r *Repo) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error) {
 	// execute in transaction
-	tx, err := br.DB.BeginTxx(ctx, &sql.TxOptions{})
+	tx, err := r.DB.BeginTxx(ctx, &sql.TxOptions{})
 
 	defer tx.Rollback()
 
@@ -164,7 +207,7 @@ func (br *BannerRepo) CreateBanner(ctx context.Context, banner entity.Banner) (*
 	// then insert new banner into banner table
 	query := fmt.Sprintf(`INSERT INTO banner (name, feature_id, content_id) 
 VALUES (:name, :feature_id, %v) 
-RETURNING id, name, feature_id, is_active, created_at, updated_at`, // todo: missing destination name row in *entity.Banner???????
+RETURNING id, name, feature_id, is_active, created_at, updated_at`,
 		content.ID)
 
 	rows, err = tx.NamedQuery(query, &banner)
@@ -200,8 +243,72 @@ RETURNING id, name, feature_id, is_active, created_at, updated_at`, // todo: mis
 	return &banner, nil
 }
 
-func (br *BannerRepo) DeleteBanner(ctx context.Context, id int) (*entity.Banner, error) {
-	row, err := br.DB.QueryxContext(ctx, "DELETE FROM banner WHERE id = $1 RETURNING *", id)
+func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error {
+	tx, err := r.DB.BeginTxx(ctx, &sql.TxOptions{})
+
+	defer tx.Rollback()
+
+	// update some fields in banner table
+	rows, err := tx.QueryxContext(
+		ctx,
+		"UPDATE banner SET feature_id = $1, is_active = $2, updated_at = now() WHERE id = $3 RETURNING content_id",
+		updateModel.FeatureID, updateModel.IsActive, id,
+	)
+	if err != nil {
+		return err
+	}
+
+	contentIdStruct := struct {
+		ContentID int `db:"content_id"`
+	}{}
+
+	// fetch content id
+	if rows.Next() {
+		if err = rows.StructScan(&contentIdStruct); err != nil {
+			return err
+		}
+	}
+
+	// close rows
+	if err = rows.Close(); err != nil {
+		return err
+	}
+
+	// update content associated with this banner
+	_, err = tx.QueryxContext(
+		ctx,
+		"UPDATE content SET title = $1, text = $2, url = $3 WHERE content_id = $4",
+		updateModel.Content.Title, updateModel.Content.Text, updateModel.Content.Url, contentIdStruct.ContentID,
+	)
+	if err != nil {
+		return err
+	}
+
+	/* update tag ids in banner_tag table:
+	to do this we need firstly delete all rows from banner_tag where banner_id = id,
+	then add new rows in this table of form (banner_id = id, tag_id = updateModel.tagIds[i])
+	*/
+	_, err = tx.QueryxContext(
+		ctx,
+		"DELETE FROM banner_tag WHERE banner_id = $1",
+		id,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, tag := range updateModel.TagIDs {
+		_, err = tx.ExecContext(ctx, fmt.Sprintf("INSERT INTO banner_tag (banner_id, tag_id) VALUES (%v, %v)", id, tag))
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *Repo) DeleteBanner(ctx context.Context, id int) (*entity.Banner, error) {
+	row, err := r.DB.QueryxContext(ctx, "DELETE FROM banner WHERE id = $1 RETURNING *", id)
 	if err != nil {
 		return nil, err
 	}
