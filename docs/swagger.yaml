@@ -1,0 +1,253 @@
+definitions:
+  request.CreateBannerRequest:
+    properties:
+      feature_id:
+        minimum: 0
+        type: integer
+      is_active:
+        type: boolean
+      tag_ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+      text:
+        minLength: 1
+        type: string
+      title:
+        minLength: 1
+        type: string
+      url:
+        minLength: 1
+        type: string
+    required:
+    - feature_id
+    - tag_ids
+    - text
+    - title
+    - url
+    type: object
+  request.UpdateBannerRequest:
+    properties:
+      feature_id:
+        type: integer
+      is_active:
+        type: boolean
+      tag_ids:
+        items:
+          type: integer
+        type: array
+      text:
+        minLength: 1
+        type: string
+      title:
+        minLength: 1
+        type: string
+      url:
+        minLength: 1
+        type: string
+    required:
+    - text
+    - title
+    - url
+    type: object
+  response.CreateBannerResponse:
+    properties:
+      banner_id:
+        type: integer
+    type: object
+  response.GetAdminBannerResponse:
+    properties:
+      banner_id:
+        type: integer
+      created_at:
+        type: string
+      feature_id:
+        type: integer
+      is_active:
+        type: boolean
+      tag_ids:
+        items:
+          type: integer
+        type: array
+      text:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+    type: object
+  response.GetUserBannerResponse:
+    properties:
+      text:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /avito-trainee/api/v1/banner:
+    get:
+      consumes:
+      - application/json
+      description: Get all banners sorting by featureID
+      parameters:
+      - description: Offset
+        in: query
+        name: offset
+        required: true
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/response.GetAdminBannerResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - JWT: []
+      summary: Get all banners
+      tags:
+      - Banner
+    post:
+      consumes:
+      - application/json
+      description: Create new banner
+      parameters:
+      - description: create banner schema
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateBannerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.CreateBannerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - JWT: []
+      summary: Create new banner
+      tags:
+      - Banner
+  /avito-trainee/api/v1/banner/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Update existing banner
+      parameters:
+      - description: update banner schema
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateBannerRequest'
+      - description: id of the updating banner
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - JWT: []
+      summary: Update existing banner
+      tags:
+      - Banner
+  /avito-trainee/api/v1/banner/user:
+    get:
+      consumes:
+      - application/json
+      description: Get banner with feature and tags
+      parameters:
+      - description: id of the feature
+        in: query
+        name: feature_id
+        required: true
+        type: string
+      - collectionFormat: csv
+        description: ids of the tags
+        in: query
+        items:
+          type: integer
+        name: tag_ids
+        required: true
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.GetUserBannerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - JWT: []
+      summary: Get banner with feature and tags
+      tags:
+      - Banner
+swagger: "2.0"

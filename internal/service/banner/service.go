@@ -7,14 +7,16 @@ import (
 
 	"avito-backend-trainee-2024/internal/domain/entity"
 
+	entityutils "avito-backend-trainee-2024/internal/pkg/utils/entity"
 	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 )
 
 type BannerRepo interface {
 	GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error)
+	GetBannerByID(ctx context.Context, id int) (*entity.Banner, error)
 	GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error)
 	CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error)
-	UpdateBanner(ctx context.Context, id int, banner entity.Banner) (*entity.Banner, error)
+	UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error
 	DeleteBanner(ctx context.Context, id int) (*entity.Banner, error)
 }
 
@@ -46,6 +48,7 @@ func (s *Service) GetAllBanners(ctx context.Context, offset, limit int) ([]*enti
 }
 
 func (s *Service) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
+	slices.Sort(tagIDs) // sort slice
 	return s.BannerRepo.GetBannerByFeatureAndTags(ctx, featureID, tagIDs)
 }
 
@@ -84,11 +87,19 @@ func (s *Service) CreateBanner(ctx context.Context, banner entity.Banner) (*enti
 	return s.BannerRepo.CreateBanner(ctx, banner)
 }
 
-func (s *Service) UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) (*entity.Banner, error) {
+func (s *Service) UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error {
 	// firstly validate that feature and tags associated with banner exists in db
 	if err := s.validateBanner(ctx, updateModel); err != nil {
-		return nil, err
+		return err
 	}
+
+	// TODO: update only init fields
+	banner, err := s.BannerRepo.GetBannerByID(ctx, id)
+	if err != nil {
+		return ErrNoSuchBanner
+	}
+
+	entityutils.InitNilFieldsOfBanner(&updateModel, banner) // TODO: MAYBE CHANGE REPO METHOD FOR OPTIMIZATION?
 
 	return s.BannerRepo.UpdateBanner(ctx, id, updateModel)
 }

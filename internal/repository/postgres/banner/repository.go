@@ -1,14 +1,15 @@
 package banner
 
 import (
+	"avito-backend-trainee-2024/internal/domain/entity"
+	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 	"context"
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"math"
 	"strconv"
-
-	"avito-backend-trainee-2024/internal/domain/entity"
+	"strings"
 )
 
 type Repo struct {
@@ -33,7 +34,7 @@ ORDER BY banner.feature_id OFFSET %v`, condition, offset)
 	} else {
 		query = fmt.Sprintf(`SELECT banner.id, name, feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
 FROM banner JOIN public.content c ON c.content_id = banner.content_id %v
-ORDER BY banner.feature_id LIMIT %V OFFSET %v`, condition, limit, offset)
+ORDER BY banner.feature_id LIMIT %v OFFSET %v`, condition, limit, offset)
 
 	}
 
@@ -116,6 +117,69 @@ func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.
 	return r.getBannersWhere(ctx, "", offset, limit)
 }
 
+func (r *Repo) GetBannerByID(ctx context.Context, id int) (*entity.Banner, error) {
+	query := fmt.Sprintf(`SELECT banner.id,
+       is_active,
+       title,
+       text,
+       url,
+       array_agg(bt.tag_id ORDER BY bt.tag_id) AS tag_ids
+FROM banner
+         JOIN public.content c ON c.content_id = banner.content_id
+         JOIN public.banner_tag bt ON banner.id = bt.banner_id
+WHERE banner.id = %v
+GROUP BY banner.id, c.content_id`,
+		id,
+	)
+
+	rows, err := r.DB.QueryxContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	type Row struct {
+		ID        int    `db:"id"`
+		IsActive  bool   `db:"is_active"`
+		Title     string `db:"title"`
+		Text      string `db:"text"`
+		Url       string `db:"url"`
+		TagIDsStr string `db:"tag_ids"`
+		TagIDsInt []int
+	}
+
+	var row Row
+
+	if rows.Next() {
+		if err = rows.StructScan(&row); err != nil {
+			return nil, err
+		}
+
+		// row.TagIDs have structure {1,2,...}
+		row.TagIDsInt = make([]int, 0, len(row.TagIDsStr)-2)
+
+		for _, tagStr := range strings.Split(row.TagIDsStr[1:len(row.TagIDsStr)-1], ",") {
+			tag, convErr := strconv.Atoi(tagStr)
+			if convErr != nil {
+				return nil, convErr
+			}
+
+			row.TagIDsInt = append(row.TagIDsInt, tag)
+		}
+	}
+
+	content := entity.Content{
+		Title: row.Title,
+		Text:  row.Text,
+		Url:   row.Url,
+	}
+
+	return &entity.Banner{
+			Content:  content,
+			IsActive: row.IsActive,
+		},
+		nil
+}
+
 /*
 GetBannerByFeatureAndTags
 
@@ -124,29 +188,6 @@ GetBannerByFeatureAndTags
 		so there's no need to return from db banner model with all initialized fields
 */
 func (r *Repo) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
-	//banners, err := r.getBannersWhere(ctx, fmt.Sprintf("WHERE banner.feature_id = %v", featureID), 0, math.MaxInt64)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//for _, banner := range banners {
-	//	if sliceutils.Equals(banner.TagIDs, tagIDs) {
-	//		return banner, nil
-	//	}
-	//}
-	//
-	//return nil, ErrNoSuchBanner
-
-	IDsStr := ""
-
-	for i, id := range tagIDs {
-		IDsStr += strconv.Itoa(id)
-
-		if i != len(tagIDs)-1 {
-			IDsStr += ","
-		}
-	}
-
 	query := fmt.Sprintf(`SELECT banner.id,
        is_active,
        title,
@@ -159,20 +200,64 @@ FROM banner
 WHERE feature_id = %v
 GROUP BY banner.id, c.content_id
 `, featureID)
-	// TODO:
-	rows, err := r.DB.QueryxContext(ctx, query)
+
+	dbRows, err := r.DB.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
 	type Row struct {
-		IsActive bool   `db:"is_active"`
-		Title    string `db:"title"`
-		Text     string `db:"text"`
-		Url      string `db:"url"`
-		TagIDs   []int  `db:"tag_ids"`
+		ID        int    `db:"id"`
+		IsActive  bool   `db:"is_active"`
+		Title     string `db:"title"`
+		Text      string `db:"text"`
+		Url       string `db:"url"`
+		TagIDsStr string `db:"tag_ids"` // todo: pgx cannot convert sql.array to golang slice, maybe use pq instead?
+		TagIDsInt []int
 	}
 
+	var rows []*Row
+
+	for dbRows.Next() {
+		var row Row
+
+		if err = dbRows.StructScan(&row); err != nil {
+			return nil, err
+		}
+
+		// row.TagIDs have structure {1,2,...}
+		row.TagIDsInt = make([]int, 0, len(row.TagIDsStr)-2)
+
+		for _, tagStr := range strings.Split(row.TagIDsStr[1:len(row.TagIDsStr)-1], ",") {
+			tag, convErr := strconv.Atoi(tagStr)
+			if convErr != nil {
+				return nil, convErr
+			}
+
+			row.TagIDsInt = append(row.TagIDsInt, tag)
+		}
+
+		rows = append(rows, &row)
+	}
+
+	// each row represents banner with banner.feature_id = featureID => find banner with banner.tag_ids = tagIDs
+	for _, row := range rows {
+		if sliceutils.Equals(row.TagIDsInt, tagIDs) { // todo: here tagIDs gotta be sorted by asc, row.TagIDs already sorted
+			content := entity.Content{
+				Title: row.Title,
+				Text:  row.Text,
+				Url:   row.Url,
+			}
+
+			return &entity.Banner{
+					Content:  content,
+					IsActive: row.IsActive,
+				},
+				nil
+		}
+	}
+
+	return nil, nil // todo: maybe return error?
 }
 
 func (r *Repo) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error) {
