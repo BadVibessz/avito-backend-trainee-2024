@@ -7,7 +7,6 @@ import (
 
 	"avito-backend-trainee-2024/internal/domain/entity"
 
-	entityutils "avito-backend-trainee-2024/internal/pkg/utils/entity"
 	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 )
 
@@ -49,30 +48,44 @@ func (s *Service) GetAllBanners(ctx context.Context, offset, limit int) ([]*enti
 
 func (s *Service) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
 	slices.Sort(tagIDs) // sort slice
-	return s.BannerRepo.GetBannerByFeatureAndTags(ctx, featureID, tagIDs)
+
+	banner, err := s.BannerRepo.GetBannerByFeatureAndTags(ctx, featureID, tagIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if banner == nil {
+		return nil, ErrNoSuchBanner
+	}
+
+	return banner, nil
 }
 
 // validateBanner checks if associated with banner tags and feature are presented in db
-func (s *Service) validateBanner(ctx context.Context, banner entity.Banner) error {
-	feature, err := s.FeatureRepo.GetFeatureByID(ctx, banner.FeatureID)
-	if err != nil || feature == nil {
-		return ErrNoSuchFeature
+func (s *Service) validateBanner(ctx context.Context, banner entity.Banner, validateFeature, validateTags bool) error {
+	if validateFeature {
+		feature, err := s.FeatureRepo.GetFeatureByID(ctx, banner.FeatureID)
+		if err != nil || feature == nil {
+			return ErrNoSuchFeature
+		}
 	}
 
-	tags, err := s.TagRepo.GetTagsWithIDs(ctx, banner.TagIDs)
-	if err != nil {
-		return errors.Join(ErrNoSuchTag, err)
-	}
+	if validateTags {
+		tags, err := s.TagRepo.GetTagsWithIDs(ctx, banner.TagIDs)
+		if err != nil {
+			return errors.Join(ErrNoSuchTag, err)
+		}
 
-	// compare two slices: sorted(tagIDs) and tags by tag.ID field
-	slices.Sort(banner.TagIDs)
+		// compare two slices: sorted(tagIDs) and tags by tag.ID field
+		slices.Sort(banner.TagIDs)
 
-	if len(banner.TagIDs) != len(tags) {
-		return ErrNoSuchTag
-	}
+		if len(banner.TagIDs) != len(tags) {
+			return ErrNoSuchTag
+		}
 
-	if !sliceutils.Equals(banner.TagIDs, sliceutils.Map(tags, func(tag *entity.Tag) int { return tag.ID })) {
-		return ErrNoSuchTag
+		if !sliceutils.Equals(banner.TagIDs, sliceutils.Map(tags, func(tag *entity.Tag) int { return tag.ID })) {
+			return ErrNoSuchTag
+		}
 	}
 
 	return nil
@@ -80,7 +93,7 @@ func (s *Service) validateBanner(ctx context.Context, banner entity.Banner) erro
 
 func (s *Service) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error) {
 	// firstly validate that feature and tags associated with banner exists in db
-	if err := s.validateBanner(ctx, banner); err != nil {
+	if err := s.validateBanner(ctx, banner, true, true); err != nil {
 		return nil, err
 	}
 
@@ -89,17 +102,9 @@ func (s *Service) CreateBanner(ctx context.Context, banner entity.Banner) (*enti
 
 func (s *Service) UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error {
 	// firstly validate that feature and tags associated with banner exists in db
-	if err := s.validateBanner(ctx, updateModel); err != nil {
+	if err := s.validateBanner(ctx, updateModel, true, updateModel.TagIDs != nil); err != nil {
 		return err
 	}
-
-	// TODO: update only init fields
-	banner, err := s.BannerRepo.GetBannerByID(ctx, id)
-	if err != nil {
-		return ErrNoSuchBanner
-	}
-
-	entityutils.InitNilFieldsOfBanner(&updateModel, banner) // TODO: MAYBE CHANGE REPO METHOD FOR OPTIMIZATION?
 
 	return s.BannerRepo.UpdateBanner(ctx, id, updateModel)
 }

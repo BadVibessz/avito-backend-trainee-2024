@@ -3,10 +3,9 @@ package entity
 import "time"
 
 type Banner struct {
-	ID        int    `db:"id"`
-	Name      string `db:"name"`
-	TagIDs    []int  `db:"tag_ids"`
-	FeatureID int    `db:"feature_id"`
+	ID        int   `db:"id"`
+	TagIDs    []int `db:"tag_ids"`
+	FeatureID int   `db:"feature_id"`
 	Content
 	IsActive  bool      `db:"is_active"`
 	CreatedAt time.Time `db:"created_at"`

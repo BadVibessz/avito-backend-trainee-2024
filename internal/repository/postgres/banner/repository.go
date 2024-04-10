@@ -28,11 +28,11 @@ func (r *Repo) getBannersWhere(ctx context.Context, condition string, offset, li
 
 	// TODO: maybe without join but two sql queries?
 	if limit == math.MaxInt64 {
-		query = fmt.Sprintf(`SELECT banner.id, name, feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
+		query = fmt.Sprintf(`SELECT banner.id,  feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
 FROM banner JOIN public.content c ON c.content_id = banner.content_id %v
 ORDER BY banner.feature_id OFFSET %v`, condition, offset)
 	} else {
-		query = fmt.Sprintf(`SELECT banner.id, name, feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
+		query = fmt.Sprintf(`SELECT banner.id,  feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
 FROM banner JOIN public.content c ON c.content_id = banner.content_id %v
 ORDER BY banner.feature_id LIMIT %v OFFSET %v`, condition, limit, offset)
 
@@ -290,9 +290,9 @@ func (r *Repo) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.
 	}
 
 	// then insert new banner into banner table
-	query := fmt.Sprintf(`INSERT INTO banner (name, feature_id, content_id) 
-VALUES (:name, :feature_id, %v) 
-RETURNING id, name, feature_id, is_active, created_at, updated_at`,
+	query := fmt.Sprintf(`INSERT INTO banner (feature_id,is_active, content_id) 
+VALUES (:feature_id, :is_active, %v) 
+RETURNING id, feature_id, is_active, created_at, updated_at`,
 		content.ID)
 
 	rows, err = tx.NamedQuery(query, &banner)
@@ -334,10 +334,15 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	defer tx.Rollback()
 
 	// update some fields in banner table
+	setQuery := fmt.Sprintf("is_active = %v, updated_at = now()", updateModel.IsActive)
+
+	if updateModel.FeatureID != 0 {
+		setQuery += fmt.Sprintf(", feature_id = %v", updateModel.FeatureID)
+	}
+
 	rows, err := tx.QueryxContext(
 		ctx,
-		"UPDATE banner SET feature_id = $1, is_active = $2, updated_at = now() WHERE id = $3 RETURNING content_id",
-		updateModel.FeatureID, updateModel.IsActive, id,
+		fmt.Sprintf("UPDATE banner SET %v WHERE id = %v RETURNING content_id", setQuery, id),
 	)
 	if err != nil {
 		return err
@@ -346,6 +351,8 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	contentIdStruct := struct {
 		ContentID int `db:"content_id"`
 	}{}
+
+	// TODO: change this method for optimization
 
 	// fetch content id
 	if rows.Next() {
@@ -362,7 +369,11 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	// update content associated with this banner
 	_, err = tx.QueryxContext(
 		ctx,
-		"UPDATE content SET title = $1, text = $2, url = $3 WHERE content_id = $4",
+		`UPDATE content
+SET title = COALESCE($1, title),
+    text = COALESCE($2, text),
+    url = COALESCE($3, text)
+WHERE content_id = $4;`,
 		updateModel.Content.Title, updateModel.Content.Text, updateModel.Content.Url, contentIdStruct.ContentID,
 	)
 	if err != nil {
@@ -373,19 +384,21 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	to do this we need firstly delete all rows from banner_tag where banner_id = id,
 	then add new rows in this table of form (banner_id = id, tag_id = updateModel.tagIds[i])
 	*/
-	_, err = tx.QueryxContext(
-		ctx,
-		"DELETE FROM banner_tag WHERE banner_id = $1",
-		id,
-	)
-	if err != nil {
-		return err
-	}
-
-	for _, tag := range updateModel.TagIDs {
-		_, err = tx.ExecContext(ctx, fmt.Sprintf("INSERT INTO banner_tag (banner_id, tag_id) VALUES (%v, %v)", id, tag))
+	if updateModel.TagIDs != nil {
+		_, err = tx.QueryxContext(
+			ctx,
+			"DELETE FROM banner_tag WHERE banner_id = $1",
+			id,
+		)
 		if err != nil {
 			return err
+		}
+
+		for _, tag := range updateModel.TagIDs {
+			_, err = tx.ExecContext(ctx, fmt.Sprintf("INSERT INTO banner_tag (banner_id, tag_id) VALUES (%v, %v)", id, tag))
+			if err != nil {
+				return err
+			}
 		}
 	}
 

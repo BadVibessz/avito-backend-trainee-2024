@@ -1,4 +1,4 @@
-package banner
+package admin
 
 import (
 	"avito-backend-trainee-2024/internal/domain/entity"
@@ -54,11 +54,9 @@ func (h *Handler) Routes() *chi.Mux {
 		r.Use(h.Middlewares...)
 
 		r.Get("/", h.GetAllBanners)
-		r.Get("/user", h.GetBannerByFeatureAndTags)
-
 		r.Post("/", h.CreateBanner)
-
-		r.Patch("/:id", h.UpdateBanner)
+		r.Patch("/{id}", h.UpdateBanner)
+		r.Delete("/{id}", h.DeleteBanner)
 	})
 
 	return router
@@ -74,12 +72,14 @@ func (h *Handler) Routes() *chi.Mux {
 //	@Tags			Banner
 //	@Accept			json
 //	@Produce		json
+//	@Param token 	header string true "admin auth token"
 //	@Param			offset	query		int	true	"Offset"
 //	@Param			limit	query		int	true	"Limit"
-//	@Success		200			{object}	[]response.GetAdminBannerResponse
-//	@Failure		401			{string}	Unauthorized
-//	@Failure		400			{string}	invalid		message	provided
-//	@Failure		500			{string}	internal	error
+//	@Success		200		{object}	[]response.GetAdminBannerResponse
+//	@Failure		401		{string}	Unauthorized
+//	@Failure		403		{string}	Forbidden
+//	@Failure		400		{string}	invalid		request
+//	@Failure		500		{string}	internal	error
 //	@Router			/avito-trainee/api/v1/banner [get]
 func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
 	// todo: admin auth
@@ -105,56 +105,6 @@ func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
-// GetBannerByFeatureAndTags godoc
-//
-//	@Summary		Get banner with feature and tags
-//	@Description	Get banner with feature and tags
-//	@Security		JWT
-//	@Tags			Banner
-//	@Accept			json
-//	@Produce		json
-//	@Param			feature_id	query		string		true	"id of the feature"
-//	@Param			tag_ids		query		[]int	true	"ids of the tags"
-//	@Success		200			{object}	response.GetUserBannerResponse
-//	@Failure		401			{string}	Unauthorized
-//	@Failure		400			{string}	invalid		message	provided
-//	@Failure		500			{string}	internal	error
-//	@Router			/avito-trainee/api/v1/banner/user [get]
-func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Request) {
-	// todo: auth
-
-	// TODO: get_last_revision flag
-
-	// TODO: banners that has is_active=false available to fetch only for admins!
-
-	featureID, err := handlerutils.GetIntParamFromQuery(req, "feature_id")
-	if err != nil {
-		msg := fmt.Sprintf("error occurred getting 'feature_id' query param: %v", err)
-
-		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
-		return
-	}
-
-	tagIDs, err := handlerutils.GetIntArrayParamFromQuery(req, "tag_ids")
-	if err != nil {
-		msg := fmt.Sprintf("error occurred getting 'tag_ids' query param: %v", err)
-
-		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
-		return
-	}
-
-	banner, err := h.Service.GetBannerByFeatureAndTags(req.Context(), featureID, tagIDs)
-	if err != nil {
-		msg := fmt.Sprintf("error occurred fetching banner: %v", err)
-
-		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
-		return
-	}
-
-	render.JSON(rw, req, mapper.MapBannerToUserBannerResponse(banner))
-	rw.WriteHeader(http.StatusOK)
-}
-
 // CreateBanner godoc
 //
 //	@Summary		Create new banner
@@ -163,11 +113,13 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 //	@Tags			Banner
 //	@Accept			json
 //	@Produce		json
+//	@Param token 	header string true "admin auth token"
 //	@Param			input	body		request.CreateBannerRequest	true	"create banner schema"
-//	@Success		200			{object}	response.CreateBannerResponse
-//	@Failure		401			{string}	Unauthorized
-//	@Failure		400			{string}	invalid		message	provided
-//	@Failure		500			{string}	internal	error
+//	@Success		200		{object}	response.CreateBannerResponse
+//	@Failure		401		{string}	Unauthorized
+//	@Failure		403		{string}	Forbidden
+//	@Failure		400		{string}	invalid		request
+//	@Failure		500		{string}	internal	error
 //	@Router			/avito-trainee/api/v1/banner [post]
 func (h *Handler) CreateBanner(rw http.ResponseWriter, req *http.Request) {
 	var bannerReq request.CreateBannerRequest
@@ -200,19 +152,21 @@ func (h *Handler) CreateBanner(rw http.ResponseWriter, req *http.Request) {
 
 // UpdateBanner godoc
 //
-//		@Summary		Update existing banner
-//		@Description	Update existing banner
-//		@Security		JWT
-//		@Tags			Banner
-//		@Accept			json
-//		@Produce		json
-//		@Param			input	body		request.UpdateBannerRequest	true	"update banner schema"
-//	 	@Param 		 	id 	path 	int 	true 	"id of the updating banner"
-//		@Success		200
-//		@Failure		401			{string}	Unauthorized
-//		@Failure		400			{string}	invalid		message	provided
-//		@Failure		500			{string}	internal	error
-//		@Router			/avito-trainee/api/v1/banner/{id} [patch]
+//	@Summary		Update existing banner
+//	@Description	Update existing banner
+//	@Security		JWT
+//	@Tags			Banner
+//	@Accept			json
+//	@Produce		json
+//	@Param token 	header string true "admin auth token"
+//	@Param			input	body	request.UpdateBannerRequest	true	"update banner schema"
+//	@Param			id		path	int							true	"id of the updating banner"
+//	@Success		200
+//	@Failure		401	{string}	Unauthorized
+//	@Failure		403	{string}	Forbidden
+//	@Failure		400	{string}	invalid		request
+//	@Failure		500	{string}	internal	error
+//	@Router			/avito-trainee/api/v1/banner/{id} [patch]
 func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 	id, err := strconv.Atoi(chi.URLParam(req, "id"))
 	if err != nil {
@@ -240,6 +194,42 @@ func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 
 	if err = h.Service.UpdateBanner(req.Context(), id, mapper.MapUpdateBannerRequestToEntity(&updateReq)); err != nil {
 		msg := fmt.Sprintf("error occurred updating banner: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
+
+// DeleteBanner godoc
+//
+//	@Summary		Delete banner
+//	@Description	Delete banner
+//	@Security		JWT
+//	@Tags			Banner
+//	@Accept			json
+//	@Produce		json
+//	@Param token 	header string true "admin auth token"
+//	@Param			id	path	int	true	"id of the banner"
+//	@Success		200
+//	@Failure		401	{string}	Unauthorized
+//	@Failure		403	{string}	Forbidden
+//	@Failure		400	{string}	invalid		request
+//	@Failure		500	{string}	internal	error
+//	@Router			/avito-trainee/api/v1/banner/{id} [delete]
+func (h *Handler) DeleteBanner(rw http.ResponseWriter, req *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(req, "id"))
+	if err != nil {
+		msg := fmt.Sprintf("inavlid url param for id provided: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+		return
+	}
+
+	_, err = h.Service.DeleteBanner(req.Context(), id)
+	if err != nil {
+		msg := fmt.Sprintf("error occurred deleting banner: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
 		return

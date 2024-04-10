@@ -5,7 +5,7 @@ import "github.com/go-playground/validator/v10"
 type UpdateContentRequest struct {
 	Title string `json:"title"`
 	Text  string `json:"text"`
-	Url   string `json:"url" validate:"url"`
+	Url   string `json:"url" validate:"omitempty,url"`
 }
 
 type UpdateBannerRequest struct {

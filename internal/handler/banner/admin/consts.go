@@ -1,4 +1,4 @@
-package banner
+package admin
 
 const (
 	DefaultOffset = 0

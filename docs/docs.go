@@ -15,6 +15,161 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/avito-trainee/api/v1/auth/admin_register": {
+            "post": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "description": "Register new user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register new user",
+                "parameters": [
+                    {
+                        "description": "register user schema",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.RegisterUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/avito-trainee/api/v1/auth/login": {
+            "post": {
+                "description": "login user via JWT",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "description": "login info",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/avito-trainee/api/v1/auth/user_register": {
+            "post": {
+                "description": "Register new user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register new user",
+                "parameters": [
+                    {
+                        "description": "register user schema",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.RegisterUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/avito-trainee/api/v1/banner": {
             "get": {
                 "security": [
@@ -34,6 +189,13 @@ const docTemplate = `{
                 ],
                 "summary": "Get all banners",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "integer",
                         "description": "Offset",
@@ -71,6 +233,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -97,6 +265,13 @@ const docTemplate = `{
                 ],
                 "summary": "Create new banner",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "create banner schema",
                         "name": "input",
@@ -126,6 +301,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -135,7 +316,144 @@ const docTemplate = `{
                 }
             }
         },
-        "/avito-trainee/api/v1/banner/user": {
+        "/avito-trainee/api/v1/banner/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "description": "Delete banner",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Banner"
+                ],
+                "summary": "Delete banner",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id of the banner",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "description": "Update existing banner",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Banner"
+                ],
+                "summary": "Update existing banner",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "update banner schema",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateBannerRequest"
+                        }
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id of the updating banner",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/avito-trainee/api/v1/user_banner": {
             "get": {
                 "security": [
                     {
@@ -154,6 +472,13 @@ const docTemplate = `{
                 ],
                 "summary": "Get banner with feature and tags",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "id of the feature",
@@ -179,67 +504,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/response.GetUserBannerResponse"
                         }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/avito-trainee/api/v1/banner/{id}": {
-            "patch": {
-                "security": [
-                    {
-                        "JWT": []
-                    }
-                ],
-                "description": "Update existing banner",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Banner"
-                ],
-                "summary": "Update existing banner",
-                "parameters": [
-                    {
-                        "description": "update banner schema",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.UpdateBannerRequest"
-                        }
-                    },
-                    {
-                        "type": "integer",
-                        "description": "id of the updating banner",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -302,13 +566,46 @@ const docTemplate = `{
                 }
             }
         },
-        "request.UpdateBannerRequest": {
+        "request.LoginRequest": {
             "type": "object",
             "required": [
-                "text",
-                "title",
-                "url"
+                "password",
+                "username"
             ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "request.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "confirm_password",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "confirm_password": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "request.UpdateBannerRequest": {
+            "type": "object",
             "properties": {
                 "feature_id": {
                     "type": "integer"
@@ -323,16 +620,13 @@ const docTemplate = `{
                     }
                 },
                 "text": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                 },
                 "title": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                 },
                 "url": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                 }
             }
         },
@@ -392,6 +686,22 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "response.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.RegisterUserResponse": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                }
+            }
         }
     }
 }`
@@ -406,6 +716,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

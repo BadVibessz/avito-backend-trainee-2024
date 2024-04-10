@@ -1,9 +1,9 @@
 package main
 
 import (
-	bannerrepo "avito-backend-trainee-2024/internal/repository/postgres/banner"
-	featurerepo "avito-backend-trainee-2024/internal/repository/postgres/feature"
-	tagrepo "avito-backend-trainee-2024/internal/repository/postgres/tag"
+	"avito-backend-trainee-2024/internal/config"
+	"avito-backend-trainee-2024/pkg/hasher"
+
 	router "avito-backend-trainee-2024/pkg/route"
 	"context"
 	"database/sql"
@@ -13,20 +13,71 @@ import (
 	"github.com/go-playground/validator/v10"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	chimiddlewares "github.com/go-chi/chi/v5/middleware"
+
+	bannerrepo "avito-backend-trainee-2024/internal/repository/postgres/banner"
+	featurerepo "avito-backend-trainee-2024/internal/repository/postgres/feature"
+	tagrepo "avito-backend-trainee-2024/internal/repository/postgres/tag"
+	userrepo "avito-backend-trainee-2024/internal/repository/postgres/user"
+
+	authservice "avito-backend-trainee-2024/internal/service/auth"
 	bannerservice "avito-backend-trainee-2024/internal/service/banner"
 
-	bannerhandler "avito-backend-trainee-2024/internal/handler/banner"
+	midlewares "avito-backend-trainee-2024/internal/handler/middleware"
 
+	adminbannerhandler "avito-backend-trainee-2024/internal/handler/banner/admin"
+	userbannerhandler "avito-backend-trainee-2024/internal/handler/banner/user"
+
+	authhandler "avito-backend-trainee-2024/internal/handler/auth"
 	httpswagger "github.com/swaggo/http-swagger"
 
 	_ "avito-backend-trainee-2024/docs"
 )
+
+const (
+	configPath = "./config"
+)
+
+func initConfig() (*config.Config, error) { // todo: to internals utils?
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+
+	viper.AddConfigPath(configPath)
+
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, err
+	}
+
+	var conf config.Config
+	if err := viper.Unmarshal(&conf); err != nil {
+		return nil, err
+	}
+
+	// env variables
+	if err := godotenv.Load(configPath + "/.env"); err != nil {
+		return nil, err
+	}
+
+	viper.SetEnvPrefix("avito_trainee")
+	viper.AutomaticEnv()
+
+	// validate todo: VALIDATOR!
+
+	conf.Jwt.Secret = viper.GetString("JWT_SECRET")
+	if conf.Jwt.Secret == "" {
+		return nil, errors.New("JWT_SECRET env variable not set")
+	}
+
+	return &conf, nil
+}
 
 func main() {
 	logger := logrus.New()
@@ -34,102 +85,55 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// todo: config
-	port := 5000
-	connStr := "postgresql://postgres:postgres@localhost:5432/avito-trainee?sslmode=disable"
-
-	conn, err := sql.Open("pgx", connStr)
+	conf, err := initConfig()
 	if err != nil {
-		logger.Fatalf("cannot open database connection with connection string: %v, err: %v", connStr, err)
+		logger.Fatalf("error occurred initializing config: %v", err)
+	}
+
+	conn, err := sql.Open("pgx", conf.Postgres.ConnectionURL())
+	if err != nil {
+		logger.Fatalf("cannot open database connection with connection string: %v, err: %v", conf.Postgres.ConnectionURL(), err)
 	}
 
 	db := sqlx.NewDb(conn, "postgres")
 
+	userRepo := userrepo.New(db)
 	bannerRepo := bannerrepo.New(db)
-
-	//banner := entity.Banner{
-	//	Name:      "test_banner",
-	//	TagIDs:    []int{5, 6},
-	//	FeatureID: 5,
-	//	Content: entity.Content{
-	//		Title: "test_content",
-	//		Text:  "some_text",
-	//		Url:   "google.com",
-	//	},
-	//	IsActive: true,
-	//}
-	//
-	//_, err = bannerRepo.CreateBanner(ctx, banner)
-	//if err != nil {
-	//	if err != nil {
-	//		logger.Fatalf("error occurred creating banner: %v", err)
-	//	}
-	//}
-
-	//logger.Infof("created banner: %+v", createdBanner)
-	//
-	//banners, err := bannerRepo.GetAllBanners(ctx, 0, math.MaxInt64)
-	//if err != nil {
-	//	logger.Fatalf("error occurred fetching banners from db: %v", err)
-	//}
-	//
-	//for _, banner = range banners {
-	//	logger.Infof("banner: %+v", banner)
-	//}
-	//
-	//updateModel := entity.Banner{
-	//	TagIDs:    []int{6},
-	//	FeatureID: 6,
-	//	Content: entity.Content{
-	//		Title: "new_title",
-	//		Text:  "new_text",
-	//		Url:   "new_url",
-	//	},
-	//	IsActive: true,
-	//}
-	//
-	//err = bannerRepo.UpdateBanner(ctx, createdBanner.ID, updateModel)
-	//if err != nil {
-	//	logger.Fatalf("error occurred updating banner: %v", err)
-	//}
-	//
-	//logger.Infof("updated banner")
-	//
-	//got, err := bannerRepo.GetBannerByFeatureAndTags(ctx, updateModel.FeatureID, updateModel.TagIDs)
-	//if err != nil {
-	//	logger.Fatalf("error occurred fetching banner from db: %v", err)
-	//}
-	//
-	//logger.Infof("banner found: %+v", got)
-	//
-	//deleted, err := bannerRepo.DeleteBanner(ctx, createdBanner.ID)
-	//if err != nil {
-	//	logger.Fatalf("error occurred deleting banners from db: %v", err)
-	//}
-	//
-	//logger.Infof("deleted: %+v", deleted)
-
 	featureRepo := featurerepo.New(db)
 	tagRepo := tagrepo.New(db)
 
 	bannerService := bannerservice.New(bannerRepo, featureRepo, tagRepo)
+	authService := authservice.New(userRepo, hasher.New())
 
-	bannerHandler := bannerhandler.New(bannerService, logger, valid)
+	// todo: init two distinct middlewares by user_token and admin_token header?
+	authMiddleware := midlewares.JWTAuthentication("token", conf.Jwt.Secret, logger)
+	adminAuthMiddleware := midlewares.AdminAuthorization(logger)
+
+	authHandler := authhandler.New(authService, conf.Jwt, logger, valid)
+	userBannerHandler := userbannerhandler.New(bannerService, logger, valid, authMiddleware)
+	adminBannerHandler := adminbannerhandler.New(bannerService, logger, valid, authMiddleware, adminAuthMiddleware)
 
 	routers := make(map[string]chi.Router)
 
-	routers["/banner"] = bannerHandler.Routes()
+	routers["/user_banner"] = userBannerHandler.Routes()
+	routers["/banner"] = adminBannerHandler.Routes()
+	routers["/auth"] = authHandler.Routes()
 
-	r := router.MakeRoutes("/avito-trainee/api/v1", routers)
+	middlewares := []router.Middleware{
+		chimiddlewares.Recoverer,
+		chimiddlewares.Logger,
+	}
+
+	r := router.MakeRoutes("/avito-trainee/api/v1", routers, middlewares...)
 
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%v", port),
+		Addr:    fmt.Sprintf(":%v", conf.Server.Port),
 		Handler: r,
 	}
 
 	// add swagger middleware
 	r.Get("/swagger/*", httpswagger.Handler(
-		httpswagger.URL(fmt.Sprintf("http://localhost:%v/swagger/doc.json", port)), // The url pointing to API definition
+		httpswagger.URL(fmt.Sprintf("http://localhost:%v/swagger/doc.json", conf.Server.Port)), // The url pointing to API definition
 	))
 
 	logger.Infof("server started at port %v", server.Addr)
@@ -140,7 +144,7 @@ func main() {
 		}
 	}()
 
-	logger.Infof("documentation available on: http://localhost:%v/swagger/index.html", port)
+	logger.Infof("documentation available on: http://localhost:%v/swagger/index.html", conf.Server.Port)
 
 	// graceful shutdown
 	interrupt := make(chan os.Signal, 1)
