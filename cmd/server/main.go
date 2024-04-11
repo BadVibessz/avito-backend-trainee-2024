@@ -3,6 +3,8 @@ package main
 import (
 	"avito-backend-trainee-2024/internal/config"
 	"avito-backend-trainee-2024/pkg/hasher"
+	gocache "github.com/patrickmn/go-cache"
+	"time"
 
 	router "avito-backend-trainee-2024/pkg/route"
 	"context"
@@ -82,6 +84,7 @@ func initConfig() (*config.Config, error) { // todo: to internals utils?
 func main() {
 	logger := logrus.New()
 	valid := validator.New(validator.WithRequiredStructEnabled())
+	cache := gocache.New(5*time.Minute, 10*time.Minute) // todo: read about expDuration!
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -108,9 +111,10 @@ func main() {
 	// todo: init two distinct middlewares by user_token and admin_token header?
 	authMiddleware := midlewares.JWTAuthentication("token", conf.Jwt.Secret, logger)
 	adminAuthMiddleware := midlewares.AdminAuthorization(logger)
+	cacheMiddleware := midlewares.InMemUserBannerCache(cache, logger)
 
 	authHandler := authhandler.New(authService, conf.Jwt, logger, valid)
-	userBannerHandler := userbannerhandler.New(bannerService, logger, valid, authMiddleware)
+	userBannerHandler := userbannerhandler.New(bannerService, logger, valid, authMiddleware, cacheMiddleware)
 	adminBannerHandler := adminbannerhandler.New(bannerService, logger, valid, authMiddleware, adminAuthMiddleware)
 
 	routers := make(map[string]chi.Router)

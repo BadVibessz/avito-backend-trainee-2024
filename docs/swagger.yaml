@@ -429,6 +429,11 @@ paths:
         name: tag_ids
         required: true
         type: array
+      - description: use last revision?
+        in: query
+        name: use_last_revision
+        required: true
+        type: boolean
       produces:
       - application/json
       responses:

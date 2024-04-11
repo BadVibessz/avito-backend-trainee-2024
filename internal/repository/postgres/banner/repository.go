@@ -367,24 +367,47 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	}
 
 	// update content associated with this banner
-	_, err = tx.QueryxContext(
-		ctx,
-		`UPDATE content
-SET title = COALESCE($1, title),
-    text = COALESCE($2, text),
-    url = COALESCE($3, text)
-WHERE content_id = $4;`,
-		updateModel.Content.Title, updateModel.Content.Text, updateModel.Content.Url, contentIdStruct.ContentID,
-	)
-	if err != nil {
-		return err
+
+	// todo: this code to private utils method
+	setQuery = ""
+	isCommaNeeded := false
+
+	if updateModel.Content.Title != "" {
+		setQuery += fmt.Sprintf("title = '%v'", updateModel.Content.Title)
+		isCommaNeeded = true
+	}
+
+	if updateModel.Content.Text != "" {
+		if isCommaNeeded {
+			setQuery += ", "
+		}
+
+		setQuery += fmt.Sprintf("text = '%v'", updateModel.Content.Text)
+		isCommaNeeded = true
+	}
+
+	if updateModel.Content.Url != "" {
+		if isCommaNeeded {
+			setQuery += ", "
+		}
+
+		setQuery += fmt.Sprintf("url = '%v'", updateModel.Content.Url)
+		isCommaNeeded = true
+	}
+
+	// execute query only if updating something
+	if isCommaNeeded != false {
+		_, err = tx.QueryxContext(ctx, fmt.Sprintf(`UPDATE content SET %v WHERE content_id = %v`, setQuery, contentIdStruct.ContentID))
+		if err != nil {
+			return err
+		}
 	}
 
 	/* update tag ids in banner_tag table:
 	to do this we need firstly delete all rows from banner_tag where banner_id = id,
 	then add new rows in this table of form (banner_id = id, tag_id = updateModel.tagIds[i])
 	*/
-	if updateModel.TagIDs != nil {
+	if len(updateModel.TagIDs) != 0 {
 		_, err = tx.QueryxContext(
 			ctx,
 			"DELETE FROM banner_tag WHERE banner_id = $1",

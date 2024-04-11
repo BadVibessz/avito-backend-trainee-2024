@@ -102,7 +102,7 @@ func (s *Service) CreateBanner(ctx context.Context, banner entity.Banner) (*enti
 
 func (s *Service) UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error {
 	// firstly validate that feature and tags associated with banner exists in db
-	if err := s.validateBanner(ctx, updateModel, true, updateModel.TagIDs != nil); err != nil {
+	if err := s.validateBanner(ctx, updateModel, updateModel.FeatureID != 0, len(updateModel.TagIDs) != 0); err != nil {
 		return err
 	}
 

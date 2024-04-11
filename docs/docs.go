@@ -496,6 +496,13 @@ const docTemplate = `{
                         "name": "tag_ids",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "use last revision?",
+                        "name": "use_last_revision",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
