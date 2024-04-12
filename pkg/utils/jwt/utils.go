@@ -7,10 +7,10 @@ func CreateJWT(payload jwt.MapClaims, method jwt.SigningMethod, secret string) (
 }
 
 func ValidateToken(tokenString, secret string) (map[string]any, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) { // todo: see doc of parse
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		return []byte(secret), nil
 	})
-	if err != nil { // todo: jwt.WithValidMethods()
+	if err != nil {
 		return nil, err
 	}
 

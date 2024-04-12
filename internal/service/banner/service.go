@@ -41,7 +41,6 @@ func New(bannerRepo BannerRepo, featureRepo FeatureRepo, tagRepo TagRepo) *Servi
 	}
 }
 
-// GetAllBanners todo: here decide data source (postgres or cached in redis)??
 func (s *Service) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
 	return s.BannerRepo.GetAllBanners(ctx, offset, limit)
 }

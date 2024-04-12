@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"math"
-	"strconv"
-	"strings"
+	"time"
+
+	stringutils "avito-backend-trainee-2024/pkg/utils/string"
 )
 
 type Repo struct {
@@ -22,32 +23,73 @@ func New(db *sqlx.DB) *Repo {
 	}
 }
 
-// general method for fetching banners with where condition
-func (r *Repo) getBannersWhere(ctx context.Context, condition string, offset, limit int) ([]*entity.Banner, error) {
-	var query string
+func setQueryForUpdateModel(updateModel entity.Banner) string {
+	setQuery := ""
+	isCommaNeeded := false
 
-	// TODO: maybe without join but two sql queries?
+	if updateModel.Content.Title != "" {
+		setQuery += fmt.Sprintf("title = '%v'", updateModel.Content.Title)
+		isCommaNeeded = true
+	}
+
+	if updateModel.Content.Text != "" {
+		if isCommaNeeded {
+			setQuery += ", "
+		}
+
+		setQuery += fmt.Sprintf("text = '%v'", updateModel.Content.Text)
+		isCommaNeeded = true
+	}
+
+	if updateModel.Content.Url != "" {
+		if isCommaNeeded {
+			setQuery += ", "
+		}
+
+		setQuery += fmt.Sprintf("url = '%v'", updateModel.Content.Url)
+		isCommaNeeded = true
+	}
+
+	return setQuery
+}
+
+func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
+	query := `SELECT banner.id,
+       feature_id,
+       is_active,
+       created_at,
+       updated_at,
+       title,
+       text,
+       url,
+       array_agg(bt.tag_id ORDER BY bt.tag_id) AS tag_ids
+FROM banner
+         JOIN public.content c ON c.content_id = banner.content_id
+         JOIN public.banner_tag bt ON banner.id = bt.banner_id
+GROUP BY c.content_id, banner.id, feature_id
+ORDER BY feature_id`
+
 	if limit == math.MaxInt64 {
-		query = fmt.Sprintf(`SELECT banner.id,  feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
-FROM banner JOIN public.content c ON c.content_id = banner.content_id %v
-ORDER BY banner.feature_id OFFSET %v`, condition, offset)
+		query = fmt.Sprintf(`%v OFFSET %v`, query, offset)
 	} else {
-		query = fmt.Sprintf(`SELECT banner.id,  feature_id, is_active, created_at, updated_at, title, text, url, c.content_id 
-FROM banner JOIN public.content c ON c.content_id = banner.content_id %v
-ORDER BY banner.feature_id LIMIT %v OFFSET %v`, condition, limit, offset)
-
+		query = fmt.Sprintf(`%v LIMIT %v OFFSET %v`, query, limit, offset)
 	}
 
-	// execute in transaction
-	tx, err := r.DB.BeginTxx(ctx, &sql.TxOptions{})
+	type Row struct {
+		ID        int       `db:"id"`
+		FeatureID int       `db:"feature_id"`
+		TagIDsStr string    `db:"tag_ids"`
+		IsActive  bool      `db:"is_active"`
+		Title     string    `db:"title"`
+		Text      string    `db:"text"`
+		Url       string    `db:"url"`
+		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
 
-	defer tx.Rollback()
-
-	if err != nil {
-		return nil, err
+		TagIDsInt []int
 	}
 
-	rows, err := tx.Queryx(query)
+	rows, err := r.DB.Queryx(query)
 	if err != nil {
 		return nil, err
 	}
@@ -55,66 +97,38 @@ ORDER BY banner.feature_id LIMIT %v OFFSET %v`, condition, limit, offset)
 	var banners []*entity.Banner
 
 	for rows.Next() {
-		var banner entity.Banner
+		var row Row
 
-		if err = rows.StructScan(&banner); err != nil {
+		if err = rows.StructScan(&row); err != nil {
 			return nil, err
+		}
+
+		// row.TagIDsStr have structure {1,2,...}
+		row.TagIDsInt, err = stringutils.FillIntSliceFromString(row.TagIDsStr[1 : len(row.TagIDsStr)-1])
+		if err != nil {
+			return nil, err
+		}
+
+		content := entity.Content{
+			Title: row.Title,
+			Text:  row.Text,
+			Url:   row.Url,
+		}
+
+		banner := entity.Banner{
+			ID:        row.ID,
+			TagIDs:    row.TagIDsInt,
+			FeatureID: row.FeatureID,
+			Content:   content,
+			IsActive:  row.IsActive,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
 		}
 
 		banners = append(banners, &banner)
 	}
 
-	// close rows
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-
-	// find tagIds associated with each banner
-	rows, err = tx.Queryx("SELECT * FROM banner_tag") // todo: performance bottleneck (understand how to use offset and limit here for optimization)
-	if err != nil {
-		return nil, err
-	}
-
-	var bannerTagsMap = make(map[int][]entity.BannerTag)
-
-	for rows.Next() {
-		var bannerTag entity.BannerTag
-
-		if err = rows.StructScan(&bannerTag); err != nil {
-			return nil, err
-		}
-
-		_, exists := bannerTagsMap[bannerTag.BannerID]
-		if !exists {
-			bannerTagsMap[bannerTag.BannerID] = []entity.BannerTag{bannerTag}
-		} else {
-			bannerTagsMap[bannerTag.BannerID] = append(bannerTagsMap[bannerTag.BannerID], bannerTag)
-		}
-	}
-
-	// close rows
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-
-	for _, banner := range banners {
-		_, exists := bannerTagsMap[banner.ID]
-		if exists {
-			for _, tag := range bannerTagsMap[banner.ID] {
-				banner.TagIDs = append(banner.TagIDs, tag.TagID)
-			}
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-
 	return banners, nil
-}
-
-func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
-	return r.getBannersWhere(ctx, "", offset, limit)
 }
 
 func (r *Repo) GetBannerByID(ctx context.Context, id int) (*entity.Banner, error) {
@@ -154,16 +168,10 @@ GROUP BY banner.id, c.content_id`,
 			return nil, err
 		}
 
-		// row.TagIDs have structure {1,2,...}
-		row.TagIDsInt = make([]int, 0, len(row.TagIDsStr)-2)
-
-		for _, tagStr := range strings.Split(row.TagIDsStr[1:len(row.TagIDsStr)-1], ",") {
-			tag, convErr := strconv.Atoi(tagStr)
-			if convErr != nil {
-				return nil, convErr
-			}
-
-			row.TagIDsInt = append(row.TagIDsInt, tag)
+		// row.TagIDsStr have structure {1,2,...}
+		row.TagIDsInt, err = stringutils.FillIntSliceFromString(row.TagIDsStr[1 : len(row.TagIDsStr)-1])
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -180,13 +188,6 @@ GROUP BY banner.id, c.content_id`,
 		nil
 }
 
-/*
-GetBannerByFeatureAndTags
-
-	TODO: this method can take long time,
-		openapi.yaml spec says that we need to return only banner.Content to user,
-		so there's no need to return from db banner model with all initialized fields
-*/
 func (r *Repo) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {
 	query := fmt.Sprintf(`SELECT banner.id,
        is_active,
@@ -212,7 +213,7 @@ GROUP BY banner.id, c.content_id
 		Title     string `db:"title"`
 		Text      string `db:"text"`
 		Url       string `db:"url"`
-		TagIDsStr string `db:"tag_ids"` // todo: pgx cannot convert sql.array to golang slice, maybe use pq instead?
+		TagIDsStr string `db:"tag_ids"`
 		TagIDsInt []int
 	}
 
@@ -226,15 +227,9 @@ GROUP BY banner.id, c.content_id
 		}
 
 		// row.TagIDs have structure {1,2,...}
-		row.TagIDsInt = make([]int, 0, len(row.TagIDsStr)-2)
-
-		for _, tagStr := range strings.Split(row.TagIDsStr[1:len(row.TagIDsStr)-1], ",") {
-			tag, convErr := strconv.Atoi(tagStr)
-			if convErr != nil {
-				return nil, convErr
-			}
-
-			row.TagIDsInt = append(row.TagIDsInt, tag)
+		row.TagIDsInt, err = stringutils.FillIntSliceFromString(row.TagIDsStr[1 : len(row.TagIDsStr)-1])
+		if err != nil {
+			return nil, err
 		}
 
 		rows = append(rows, &row)
@@ -242,7 +237,7 @@ GROUP BY banner.id, c.content_id
 
 	// each row represents banner with banner.feature_id = featureID => find banner with banner.tag_ids = tagIDs
 	for _, row := range rows {
-		if sliceutils.Equals(row.TagIDsInt, tagIDs) { // todo: here tagIDs gotta be sorted by asc, row.TagIDs already sorted
+		if sliceutils.Equals(row.TagIDsInt, tagIDs) { // here tagIDs gotta be sorted by asc, row.TagIDs already sorted
 			content := entity.Content{
 				Title: row.Title,
 				Text:  row.Text,
@@ -257,7 +252,7 @@ GROUP BY banner.id, c.content_id
 		}
 	}
 
-	return nil, nil // todo: maybe return error?
+	return nil, nil
 }
 
 func (r *Repo) CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error) {
@@ -352,8 +347,6 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 		ContentID int `db:"content_id"`
 	}{}
 
-	// TODO: change this method for optimization
-
 	// fetch content id
 	if rows.Next() {
 		if err = rows.StructScan(&contentIdStruct); err != nil {
@@ -367,36 +360,10 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 	}
 
 	// update content associated with this banner
-
-	// todo: this code to private utils method
-	setQuery = ""
-	isCommaNeeded := false
-
-	if updateModel.Content.Title != "" {
-		setQuery += fmt.Sprintf("title = '%v'", updateModel.Content.Title)
-		isCommaNeeded = true
-	}
-
-	if updateModel.Content.Text != "" {
-		if isCommaNeeded {
-			setQuery += ", "
-		}
-
-		setQuery += fmt.Sprintf("text = '%v'", updateModel.Content.Text)
-		isCommaNeeded = true
-	}
-
-	if updateModel.Content.Url != "" {
-		if isCommaNeeded {
-			setQuery += ", "
-		}
-
-		setQuery += fmt.Sprintf("url = '%v'", updateModel.Content.Url)
-		isCommaNeeded = true
-	}
+	setQuery = setQueryForUpdateModel(updateModel)
 
 	// execute query only if updating something
-	if isCommaNeeded != false {
+	if setQuery != "" {
 		_, err = tx.QueryxContext(ctx, fmt.Sprintf(`UPDATE content SET %v WHERE content_id = %v`, setQuery, contentIdStruct.ContentID))
 		if err != nil {
 			return err

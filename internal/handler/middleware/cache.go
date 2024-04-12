@@ -3,6 +3,7 @@ package middleware
 import (
 	"avito-backend-trainee-2024/internal/handler/response"
 	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
+	urlutils "avito-backend-trainee-2024/pkg/utils/url"
 	"context"
 	"fmt"
 	"github.com/go-chi/render"
@@ -20,8 +21,11 @@ func InMemUserBannerCache(cache *cache.Cache, logger *logrus.Logger) Handler {
 				next.ServeHTTP(rw, req) // cache only get requests
 			}
 
-			key := req.URL.RequestURI() // take requested uri as key
-			req = req.WithContext(context.WithValue(req.Context(), req.URL.RequestURI(), make(MiddlewareData)))
+			// take requested uri as key without 'use_last_revision' query param to cache data retrieved from db
+			key := urlutils.RemoveQueryParamByKey(*req.URL, "use_last_revision").RequestURI()
+
+			// add map[string]any to request context, so handler can add some data to it
+			req = req.WithContext(context.WithValue(req.Context(), key, make(MiddlewareData)))
 
 			useLastRevision, err := handlerutils.GetStringParamFromQuery(req, "use_last_revision")
 			if err != nil {
@@ -33,11 +37,11 @@ func InMemUserBannerCache(cache *cache.Cache, logger *logrus.Logger) Handler {
 
 			var data MiddlewareData
 
-			if val := req.Context().Value(key); val != nil {
-				data = val.(MiddlewareData)
-			}
-
 			setToCacheFunc := func() {
+				if val := req.Context().Value(key); val != nil {
+					data = val.(MiddlewareData)
+				}
+
 				banner, exists := data["banner"]
 				if exists {
 					cache.Set(key, banner, 0)
@@ -74,7 +78,7 @@ func InMemUserBannerCache(cache *cache.Cache, logger *logrus.Logger) Handler {
 					return
 				}
 
-				if isActive != "true" && req.Header.Get("is_admin") != "true" {
+				if isActive != true && req.Header.Get("is_admin") != "true" {
 					msg := "banner is inactive"
 
 					handlerutils.WriteErrResponseAndLog(rw, logger, http.StatusNoContent, msg, msg)

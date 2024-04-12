@@ -14,6 +14,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
+	urlutils "avito-backend-trainee-2024/pkg/utils/url"
 )
 
 type Service interface {
@@ -103,7 +104,9 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 
 	resp := mapper.MapBannerToUserBannerResponse(banner)
 
-	if middlewareData, ok := req.Context().Value(req.URL.RequestURI()).(middleware.MiddlewareData); ok {
+	if middlewareData, ok := req.Context().
+		Value(urlutils.RemoveQueryParamByKey(*req.URL, "use_last_revision").
+			RequestURI()).(middleware.MiddlewareData); ok {
 		middlewareData["banner"] = resp
 		middlewareData["is_active"] = banner.IsActive
 	}

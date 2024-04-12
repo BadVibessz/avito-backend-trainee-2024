@@ -6,7 +6,7 @@ type Postgres struct {
 	Host     string
 	Port     int
 	User     string
-	Password string // todo: to .env?
+	Password string
 	DBName   string
 }
 

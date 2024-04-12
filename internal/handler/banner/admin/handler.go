@@ -62,8 +62,6 @@ func (h *Handler) Routes() *chi.Mux {
 	return router
 }
 
-// TODO: change swaggo annotations
-
 // GetAllBanners godoc
 //
 //	@Summary		Get all banners
@@ -82,8 +80,6 @@ func (h *Handler) Routes() *chi.Mux {
 //	@Failure		500		{string}	internal	error
 //	@Router			/avito-trainee/api/v1/banner [get]
 func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
-	// todo: admin auth
-
 	paginationOpts := handlerinternalutils.GetPaginationOptsFromQuery(req, DefaultOffset, DefaultLimit)
 
 	if err := paginationOpts.Validate(h.validator); err != nil {

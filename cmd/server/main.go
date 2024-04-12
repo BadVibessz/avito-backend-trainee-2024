@@ -48,7 +48,7 @@ const (
 	configPath = "./config"
 )
 
-func initConfig() (*config.Config, error) { // todo: to internals utils?
+func initConfig() (*config.Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
@@ -71,8 +71,6 @@ func initConfig() (*config.Config, error) { // todo: to internals utils?
 	viper.SetEnvPrefix("avito_trainee")
 	viper.AutomaticEnv()
 
-	// validate todo: VALIDATOR!
-
 	conf.Jwt.Secret = viper.GetString("JWT_SECRET")
 	if conf.Jwt.Secret == "" {
 		return nil, errors.New("JWT_SECRET env variable not set")
@@ -84,7 +82,7 @@ func initConfig() (*config.Config, error) { // todo: to internals utils?
 func main() {
 	logger := logrus.New()
 	valid := validator.New(validator.WithRequiredStructEnabled())
-	cache := gocache.New(5*time.Minute, 10*time.Minute) // todo: read about expDuration!
+	cache := gocache.New(5*time.Minute, 10*time.Minute)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -108,7 +106,6 @@ func main() {
 	bannerService := bannerservice.New(bannerRepo, featureRepo, tagRepo)
 	authService := authservice.New(userRepo, hasher.New())
 
-	// todo: init two distinct middlewares by user_token and admin_token header?
 	authMiddleware := midlewares.JWTAuthentication("token", conf.Jwt.Secret, logger)
 	adminAuthMiddleware := midlewares.AdminAuthorization(logger)
 	cacheMiddleware := midlewares.InMemUserBannerCache(cache, logger)
