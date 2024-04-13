@@ -11,6 +11,11 @@ var (
 			IsAdmin:        false,
 			HashedPassword: "12345678",
 		},
+		{
+			Username:       "admin",
+			IsAdmin:        true,
+			HashedPassword: "12345678",
+		},
 	}
 
 	banners = []entity.Banner{
@@ -23,6 +28,16 @@ var (
 				Url:   "http://url.com",
 			},
 			IsActive: true,
+		},
+		{
+			TagIDs:    []int{1},
+			FeatureID: 2,
+			Content: entity.Content{
+				Title: "title2",
+				Text:  "text2",
+				Url:   "http://url2.com",
+			},
+			IsActive: false,
 		},
 	}
 )

@@ -67,6 +67,7 @@ func (h *Handler) Routes() *chi.Mux {
 //	@Success		200			{object}	response.GetUserBannerResponse
 //	@Failure		401			{string}	Unauthorized
 //	@Failure		400			{string}	invalid		request
+//	@Failure		403			{string}	invalid		request
 //	@Failure		500			{string}	internal	error
 //	@Router			/avito-trainee/api/v1/user_banner [get]
 func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Request) {
@@ -98,7 +99,7 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 	if !banner.IsActive && req.Header.Get("is_admin") != "true" {
 		msg := "banner is inactive"
 
-		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusNoContent, msg, msg)
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusForbidden, msg, msg)
 		return
 	}
 

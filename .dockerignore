@@ -1,0 +1,5 @@
+/tests
+/resources
+
+*.md
+*_test.go

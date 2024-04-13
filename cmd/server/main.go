@@ -98,6 +98,10 @@ func main() {
 
 	db := sqlx.NewDb(conn, "postgres")
 
+	if err = db.Ping(); err != nil {
+		logger.Fatalf("can't ping database: %v", err)
+	}
+
 	userRepo := userrepo.New(db)
 	bannerRepo := bannerrepo.New(db)
 	featureRepo := featurerepo.New(db)
