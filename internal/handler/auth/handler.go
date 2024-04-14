@@ -1,21 +1,23 @@
 package auth
 
 import (
-	"avito-backend-trainee-2024/internal/config"
-	"avito-backend-trainee-2024/internal/domain/entity"
-	"avito-backend-trainee-2024/internal/handler/mapper"
-	"avito-backend-trainee-2024/internal/handler/request"
-	"avito-backend-trainee-2024/internal/handler/response"
-	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
-	"net/http"
 
+	"avito-backend-trainee-2024/internal/config"
+	"avito-backend-trainee-2024/internal/domain/entity"
+	"avito-backend-trainee-2024/internal/handler/mapper"
+	"avito-backend-trainee-2024/internal/handler/request"
+	"avito-backend-trainee-2024/internal/handler/response"
+
+	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
 	jwtutils "avito-backend-trainee-2024/pkg/utils/jwt"
 )
 
@@ -51,8 +53,11 @@ func (h *Handler) Routes() *chi.Mux {
 	router.Group(func(r chi.Router) {
 		r.Use(h.Middlewares...)
 
-		r.Post("/user_register", h.RegisterUser)
 		r.Post("/admin_register", h.RegisterAdmin)
+	})
+
+	router.Group(func(r chi.Router) {
+		r.Post("/user_register", h.RegisterUser)
 		r.Post("/login", h.Login)
 	})
 
@@ -78,6 +83,7 @@ func (h *Handler) RegisterUser(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred decoding request body to RegisterRequest srtuct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -85,6 +91,7 @@ func (h *Handler) RegisterUser(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred validating RegisterRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -93,6 +100,7 @@ func (h *Handler) RegisterUser(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred registering user: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -116,14 +124,13 @@ func (h *Handler) RegisterUser(rw http.ResponseWriter, req *http.Request) {
 //	@Failure		500		{string}	internal	error
 //	@Router			/avito-trainee/api/v1/auth/admin_register [post]
 func (h *Handler) RegisterAdmin(rw http.ResponseWriter, req *http.Request) {
-	// todo: admin auth (only admin can register new admin)
-
 	var registerReq request.RegisterRequest
 
 	if err := render.DecodeJSON(req.Body, &registerReq); err != nil {
 		msg := fmt.Sprintf("error occurred decoding request body to RegisterRequest srtuct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -131,6 +138,7 @@ func (h *Handler) RegisterAdmin(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred validating RegisterRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -139,6 +147,7 @@ func (h *Handler) RegisterAdmin(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred registering admin: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -165,6 +174,7 @@ func (h *Handler) Login(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred decoding request body to LoginRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -172,6 +182,7 @@ func (h *Handler) Login(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred validating LoginRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -180,6 +191,7 @@ func (h *Handler) Login(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred while user login: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -195,6 +207,7 @@ func (h *Handler) Login(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred signing jwt token: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusInternalServerError, msg, msg)
+
 		return
 	}
 

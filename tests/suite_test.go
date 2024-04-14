@@ -1,30 +1,32 @@
 package tests
 
 import (
+	"context"
+	"database/sql"
+	"net/http"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
+	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/suite"
+
+	gocache "github.com/patrickmn/go-cache"
+
 	"avito-backend-trainee-2024/internal/domain/entity"
+	"avito-backend-trainee-2024/pkg/hasher"
+
 	userbannerhandler "avito-backend-trainee-2024/internal/handler/banner/user"
 	midlewares "avito-backend-trainee-2024/internal/handler/middleware"
 	bannerrepo "avito-backend-trainee-2024/internal/repository/postgres/banner"
 	featurerepo "avito-backend-trainee-2024/internal/repository/postgres/feature"
 	tagrepo "avito-backend-trainee-2024/internal/repository/postgres/tag"
 	userrepo "avito-backend-trainee-2024/internal/repository/postgres/user"
-	bannerservice "avito-backend-trainee-2024/internal/service/banner"
-	"avito-backend-trainee-2024/pkg/hasher"
-	"context"
-	"database/sql"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-playground/validator/v10"
-	gocache "github.com/patrickmn/go-cache"
-	"github.com/sirupsen/logrus"
-	"net/http"
-	"os"
-	"testing"
-	"time"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/stretchr/testify/suite"
-
 	authservice "avito-backend-trainee-2024/internal/service/auth"
+	bannerservice "avito-backend-trainee-2024/internal/service/banner"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -36,6 +38,7 @@ type BannerService interface {
 
 type BannerRepo interface {
 	GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error)
+	GetBannersWithFeatureAndTag(ctx context.Context, featureID, tagID int, offset, limit int) ([]*entity.Banner, error)
 	GetBannerByID(ctx context.Context, id int) (*entity.Banner, error)
 	GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error)
 	CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error)

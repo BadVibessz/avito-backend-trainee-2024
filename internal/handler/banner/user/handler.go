@@ -1,17 +1,18 @@
 package user
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
+	"github.com/sirupsen/logrus"
+
 	"avito-backend-trainee-2024/internal/domain/entity"
 	"avito-backend-trainee-2024/internal/handler/mapper"
 	"avito-backend-trainee-2024/internal/handler/middleware"
-	"context"
-	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/render"
-	"github.com/sirupsen/logrus"
-	"net/http"
-
-	"github.com/go-playground/validator/v10"
 
 	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
 	urlutils "avito-backend-trainee-2024/pkg/utils/url"
@@ -76,6 +77,7 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 		msg := fmt.Sprintf("error occurred getting 'feature_id' query param: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -84,6 +86,7 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 		msg := fmt.Sprintf("error occurred getting 'tag_ids' query param: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -92,6 +95,7 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 		msg := fmt.Sprintf("error occurred fetching banner: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -100,6 +104,7 @@ func (h *Handler) GetBannerByFeatureAndTags(rw http.ResponseWriter, req *http.Re
 		msg := "banner is inactive"
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusForbidden, msg, msg)
+
 		return
 	}
 

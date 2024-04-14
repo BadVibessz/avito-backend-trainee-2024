@@ -1,15 +1,18 @@
 package middleware
 
 import (
-	"avito-backend-trainee-2024/internal/handler/response"
-	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
-	urlutils "avito-backend-trainee-2024/pkg/utils/url"
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/render"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
-	"net/http"
+
+	"avito-backend-trainee-2024/internal/handler/response"
+
+	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
+	urlutils "avito-backend-trainee-2024/pkg/utils/url"
 )
 
 type MiddlewareData = map[string]any

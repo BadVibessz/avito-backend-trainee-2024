@@ -7,3 +7,9 @@ postgres:
   user: postgres
   password: postgres
   dbname: avito-trainee
+  retries: 5
+  interval: 5
+
+cache:
+  expiration: 5
+  cleanup_interval: 10

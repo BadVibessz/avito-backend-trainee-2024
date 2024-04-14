@@ -177,7 +177,7 @@ const docTemplate = `{
                         "JWT": []
                     }
                 ],
-                "description": "Get all banners sorting by featureID",
+                "description": "Get banners have feature and tag",
                 "consumes": [
                     "application/json"
                 ],
@@ -187,13 +187,27 @@ const docTemplate = `{
                 "tags": [
                     "Banner"
                 ],
-                "summary": "Get all banners",
+                "summary": "Get banners have feature and tag",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "admin auth token",
                         "name": "token",
                         "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Feature ID",
+                        "name": "feature_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Tag ID",
+                        "name": "tag_id",
+                        "in": "query",
                         "required": true
                     },
                     {
@@ -287,6 +301,84 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.CreateBannerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/avito-trainee/api/v1/banner/all": {
+            "get": {
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "description": "Get all banners sorting by featureID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Banner"
+                ],
+                "summary": "Get all banners",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin auth token",
+                        "name": "token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/response.GetAdminBannerResponse"
+                            }
                         }
                     },
                     "400": {
@@ -520,6 +612,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }

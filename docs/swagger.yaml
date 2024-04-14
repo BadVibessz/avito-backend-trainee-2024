@@ -225,13 +225,23 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get all banners sorting by featureID
+      description: Get banners have feature and tag
       parameters:
       - description: admin auth token
         in: header
         name: token
         required: true
         type: string
+      - description: Feature ID
+        in: query
+        name: feature_id
+        required: true
+        type: integer
+      - description: Tag ID
+        in: query
+        name: tag_id
+        required: true
+        type: integer
       - description: Offset
         in: query
         name: offset
@@ -269,7 +279,7 @@ paths:
             type: string
       security:
       - JWT: []
-      summary: Get all banners
+      summary: Get banners have feature and tag
       tags:
       - Banner
     post:
@@ -405,6 +415,57 @@ paths:
       summary: Update existing banner
       tags:
       - Banner
+  /avito-trainee/api/v1/banner/all:
+    get:
+      consumes:
+      - application/json
+      description: Get all banners sorting by featureID
+      parameters:
+      - description: admin auth token
+        in: header
+        name: token
+        required: true
+        type: string
+      - description: Offset
+        in: query
+        name: offset
+        required: true
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/response.GetAdminBannerResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - JWT: []
+      summary: Get all banners
+      tags:
+      - Banner
   /avito-trainee/api/v1/user_banner:
     get:
       consumes:
@@ -447,6 +508,10 @@ paths:
             type: string
         "401":
           description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "500":

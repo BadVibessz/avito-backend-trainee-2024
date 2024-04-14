@@ -1,27 +1,28 @@
 package admin
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
-	"avito-backend-trainee-2024/internal/handler/mapper"
-	"avito-backend-trainee-2024/internal/handler/request"
-	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-
 	"github.com/go-playground/validator/v10"
+	"github.com/sirupsen/logrus"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
+	"avito-backend-trainee-2024/internal/handler/mapper"
+	"avito-backend-trainee-2024/internal/handler/request"
 
 	handlerinternalutils "avito-backend-trainee-2024/internal/pkg/utils/handler"
 	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
+	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 )
 
 type Service interface {
 	GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error)
+	GetBannersWithFeatureAndTag(ctx context.Context, featureID, tagID int, offset, limit int) ([]*entity.Banner, error)
 	GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error)
 	CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error)
 	UpdateBanner(ctx context.Context, id int, updateModel entity.Banner) error
@@ -53,7 +54,8 @@ func (h *Handler) Routes() *chi.Mux {
 	router.Group(func(r chi.Router) {
 		r.Use(h.Middlewares...)
 
-		r.Get("/", h.GetAllBanners)
+		r.Get("/all", h.GetAllBanners)
+		r.Get("/", h.GetBannersWithFeatureAndTag)
 		r.Post("/", h.CreateBanner)
 		r.Patch("/{id}", h.UpdateBanner)
 		r.Delete("/{id}", h.DeleteBanner)
@@ -78,7 +80,7 @@ func (h *Handler) Routes() *chi.Mux {
 //	@Failure		403		{string}	Forbidden
 //	@Failure		400		{string}	invalid		request
 //	@Failure		500		{string}	internal	error
-//	@Router			/avito-trainee/api/v1/banner [get]
+//	@Router			/avito-trainee/api/v1/banner/all [get]
 func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
 	paginationOpts := handlerinternalutils.GetPaginationOptsFromQuery(req, DefaultOffset, DefaultLimit)
 
@@ -86,6 +88,7 @@ func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("invalid pagination options provided: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -94,6 +97,68 @@ func (h *Handler) GetAllBanners(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred fetching banners: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
+		return
+	}
+
+	render.JSON(rw, req, sliceutils.Map(banners, mapper.MapBannerToAdminBannerResponse))
+	rw.WriteHeader(http.StatusOK)
+}
+
+// GetBannersWithFeatureAndTag godoc
+//
+//	@Summary		Get banners have feature and tag
+//	@Description	Get banners have feature and tag
+//	@Security		JWT
+//	@Tags			Banner
+//	@Accept			json
+//	@Produce		json
+//	@Param token 	header string true "admin auth token"
+//	@Param			feature_id	query		int	true	"Feature ID"
+//	@Param			tag_id	query		int	true	"Tag ID"
+//	@Param			offset	query		int	true	"Offset"
+//	@Param			limit	query		int	true	"Limit"
+//	@Success		200		{object}	[]response.GetAdminBannerResponse
+//	@Failure		401		{string}	Unauthorized
+//	@Failure		403		{string}	Forbidden
+//	@Failure		400		{string}	invalid		request
+//	@Failure		500		{string}	internal	error
+//	@Router			/avito-trainee/api/v1/banner [get]
+func (h *Handler) GetBannersWithFeatureAndTag(rw http.ResponseWriter, req *http.Request) {
+	featureID, err := handlerutils.GetIntParamFromQuery(req, "feature_id")
+	if err != nil {
+		msg := fmt.Sprintf("invalid feature_id query param provided: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
+		return
+	}
+
+	tagID, err := handlerutils.GetIntParamFromQuery(req, "tag_id")
+	if err != nil {
+		msg := fmt.Sprintf("invalid tag_id query param provided: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
+		return
+	}
+
+	paginationOpts := handlerinternalutils.GetPaginationOptsFromQuery(req, DefaultOffset, DefaultLimit)
+
+	if err = paginationOpts.Validate(h.validator); err != nil {
+		msg := fmt.Sprintf("invalid pagination options provided: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
+		return
+	}
+
+	banners, err := h.Service.GetBannersWithFeatureAndTag(req.Context(), featureID, tagID, paginationOpts.Offset, paginationOpts.Limit)
+	if err != nil {
+		msg := fmt.Sprintf("error occurred fetching banners: %v", err)
+
+		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -124,6 +189,7 @@ func (h *Handler) CreateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred decoding request body to CreateBannerRequest srtuct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -131,6 +197,7 @@ func (h *Handler) CreateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred validating CreateBannerRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -139,6 +206,7 @@ func (h *Handler) CreateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred creating banner: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -169,6 +237,7 @@ func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("inavlid url param for id provided: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -178,6 +247,7 @@ func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred decoding request body to UpdateBannerRequest srtuct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -185,6 +255,7 @@ func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred validating UpdateBannerRequest struct: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -192,6 +263,7 @@ func (h *Handler) UpdateBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred updating banner: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -220,6 +292,7 @@ func (h *Handler) DeleteBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("inavlid url param for id provided: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 
@@ -228,6 +301,7 @@ func (h *Handler) DeleteBanner(rw http.ResponseWriter, req *http.Request) {
 		msg := fmt.Sprintf("error occurred deleting banner: %v", err)
 
 		handlerutils.WriteErrResponseAndLog(rw, h.logger, http.StatusBadRequest, msg, msg)
+
 		return
 	}
 

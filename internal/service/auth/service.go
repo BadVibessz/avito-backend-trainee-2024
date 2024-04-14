@@ -1,9 +1,11 @@
 package auth
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
 	"context"
+
 	"golang.org/x/crypto/bcrypt"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
 )
 
 type UserRepo interface {

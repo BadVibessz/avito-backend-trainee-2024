@@ -1,15 +1,17 @@
 package middleware
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
-	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
-	jwtutils "avito-backend-trainee-2024/pkg/utils/jwt"
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
+
+	handlerutils "avito-backend-trainee-2024/pkg/utils/handler"
+	jwtutils "avito-backend-trainee-2024/pkg/utils/jwt"
 	maputils "avito-backend-trainee-2024/pkg/utils/map"
 )
 

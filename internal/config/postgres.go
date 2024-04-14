@@ -8,6 +8,9 @@ type Postgres struct {
 	User     string
 	Password string
 	DBName   string
+
+	Retries  int
+	Interval int
 }
 
 func (p *Postgres) ConnectionDSN() string {

@@ -1,9 +1,11 @@
 package user
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
 	"context"
+
 	"github.com/jmoiron/sqlx"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
 )
 
 type Repo struct {
@@ -31,6 +33,8 @@ func (r *Repo) CreateUser(ctx context.Context, user entity.User) (*entity.User, 
 			return nil, err
 		}
 	}
+
+	defer rows.Close()
 
 	return &created, nil
 }

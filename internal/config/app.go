@@ -4,4 +4,5 @@ type Config struct {
 	Server
 	Jwt
 	Postgres
+	Cache
 }

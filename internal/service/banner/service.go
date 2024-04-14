@@ -12,6 +12,7 @@ import (
 
 type BannerRepo interface {
 	GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error)
+	GetBannersWithFeatureAndTag(ctx context.Context, featureID, tagID int, offset, limit int) ([]*entity.Banner, error)
 	GetBannerByID(ctx context.Context, id int) (*entity.Banner, error)
 	GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error)
 	CreateBanner(ctx context.Context, banner entity.Banner) (*entity.Banner, error)
@@ -25,6 +26,7 @@ type FeatureRepo interface {
 
 type TagRepo interface {
 	GetTagsWithIDs(ctx context.Context, IDs []int) ([]*entity.Tag, error)
+	GetTagByID(ctx context.Context, id int) (*entity.Tag, error)
 }
 
 type Service struct {
@@ -43,6 +45,26 @@ func New(bannerRepo BannerRepo, featureRepo FeatureRepo, tagRepo TagRepo) *Servi
 
 func (s *Service) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
 	return s.BannerRepo.GetAllBanners(ctx, offset, limit)
+}
+
+func (s *Service) GetBannersWithFeatureAndTag(ctx context.Context, featureID, tagID int, offset, limit int) ([]*entity.Banner, error) {
+	// check if provided tag and feature exists
+	tag, err := s.TagRepo.GetTagByID(ctx, tagID)
+	if err != nil || tag == nil {
+		return nil, err
+	}
+
+	feature, err := s.FeatureRepo.GetFeatureByID(ctx, featureID)
+	if err != nil || feature == nil {
+		return nil, err
+	}
+
+	banners, err := s.BannerRepo.GetBannersWithFeatureAndTag(ctx, featureID, tagID, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return banners, nil
 }
 
 func (s *Service) GetBannerByFeatureAndTags(ctx context.Context, featureID int, tagIDs []int) (*entity.Banner, error) {

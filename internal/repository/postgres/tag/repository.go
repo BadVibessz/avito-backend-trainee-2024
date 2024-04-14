@@ -1,11 +1,13 @@
 package tag
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
 	"context"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"strconv"
+
+	"github.com/jmoiron/sqlx"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
 )
 
 type Repo struct {
@@ -19,20 +21,22 @@ func New(db *sqlx.DB) *Repo {
 }
 
 func (r *Repo) GetTagsWithIDs(ctx context.Context, IDs []int) ([]*entity.Tag, error) {
-	IDsStr := ""
+	idsStr := ""
 
 	for i, id := range IDs {
-		IDsStr += strconv.Itoa(id)
+		idsStr += strconv.Itoa(id)
 
 		if i != len(IDs)-1 {
-			IDsStr += ","
+			idsStr += ","
 		}
 	}
 
-	rows, err := r.DB.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM tag WHERE id in (%v) ORDER BY id", IDsStr))
+	rows, err := r.DB.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM tag WHERE id in (%v) ORDER BY id", idsStr))
 	if err != nil {
 		return nil, err
 	}
+
+	defer rows.Close()
 
 	var tags []*entity.Tag
 
@@ -47,4 +51,23 @@ func (r *Repo) GetTagsWithIDs(ctx context.Context, IDs []int) ([]*entity.Tag, er
 	}
 
 	return tags, nil
+}
+
+func (r *Repo) GetTagByID(ctx context.Context, id int) (*entity.Tag, error) {
+	rows, err := r.DB.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM tag WHERE id = %v", id))
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var tag entity.Tag
+
+	if rows.Next() {
+		if err = rows.StructScan(&tag); err != nil {
+			return nil, err
+		}
+	}
+
+	return &tag, nil
 }

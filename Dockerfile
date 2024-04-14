@@ -7,6 +7,8 @@ COPY . .
 RUN go mod download
 RUN go build -o /app.bin ./cmd/server/main.go
 
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+
 EXPOSE 5000
 
-CMD ["/app.bin"]
+CMD goose -dir db/migrations postgres 'postgresql://postgres:postgres@localhost:5432/avito-trainee?sslmode=disable' up && /app.bin

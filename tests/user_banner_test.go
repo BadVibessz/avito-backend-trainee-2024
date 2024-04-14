@@ -1,14 +1,17 @@
 package tests
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
-	router "avito-backend-trainee-2024/pkg/route"
-	jwtutils "avito-backend-trainee-2024/pkg/utils/jwt"
 	"encoding/json"
-	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"net/http/httptest"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
+
+	router "avito-backend-trainee-2024/pkg/route"
+	jwtutils "avito-backend-trainee-2024/pkg/utils/jwt"
 )
 
 func (s *Suite) TestGetNotExistingBannerByUser() {

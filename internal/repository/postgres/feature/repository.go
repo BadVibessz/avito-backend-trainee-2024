@@ -1,9 +1,11 @@
 package feature
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
 	"context"
+
 	"github.com/jmoiron/sqlx"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
 )
 
 type Repo struct {

@@ -1,15 +1,18 @@
 package banner
 
 import (
-	"avito-backend-trainee-2024/internal/domain/entity"
-	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"math"
+	"slices"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+
+	"avito-backend-trainee-2024/internal/domain/entity"
+
+	sliceutils "avito-backend-trainee-2024/pkg/utils/slice"
 	stringutils "avito-backend-trainee-2024/pkg/utils/string"
 )
 
@@ -47,14 +50,13 @@ func setQueryForUpdateModel(updateModel entity.Banner) string {
 		}
 
 		setQuery += fmt.Sprintf("url = '%v'", updateModel.Content.Url)
-		isCommaNeeded = true
 	}
 
 	return setQuery
 }
 
-func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
-	query := `SELECT banner.id,
+func (r *Repo) getBannersWhere(ctx context.Context, whereQuery string, offset, limit int) ([]*entity.Banner, error) {
+	query := fmt.Sprintf(`SELECT banner.id,
        feature_id,
        is_active,
        created_at,
@@ -66,8 +68,9 @@ func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.
 FROM banner
          JOIN public.content c ON c.content_id = banner.content_id
          JOIN public.banner_tag bt ON banner.id = bt.banner_id
+%v
 GROUP BY c.content_id, banner.id, feature_id
-ORDER BY feature_id`
+ORDER BY feature_id`, whereQuery)
 
 	if limit == math.MaxInt64 {
 		query = fmt.Sprintf(`%v OFFSET %v`, query, offset)
@@ -89,10 +92,12 @@ ORDER BY feature_id`
 		TagIDsInt []int
 	}
 
-	rows, err := r.DB.Queryx(query)
+	rows, err := r.DB.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
+
+	defer rows.Close()
 
 	var banners []*entity.Banner
 
@@ -131,6 +136,28 @@ ORDER BY feature_id`
 	return banners, nil
 }
 
+func (r *Repo) GetAllBanners(ctx context.Context, offset, limit int) ([]*entity.Banner, error) {
+	return r.getBannersWhere(ctx, "", offset, limit)
+}
+
+func (r *Repo) GetBannersWithFeatureAndTag(ctx context.Context, featureID, tagID int, offset, limit int) ([]*entity.Banner, error) {
+	banners, err := r.getBannersWhere(ctx, fmt.Sprintf("WHERE feature_id = %v", featureID), offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*entity.Banner, 0, len(banners))
+
+	// add only banners that have tagID in their tagIDs
+	for _, banner := range banners {
+		if slices.Contains(banner.TagIDs, tagID) {
+			res = append(res, banner)
+		}
+	}
+
+	return res, nil
+}
+
 func (r *Repo) GetBannerByID(ctx context.Context, id int) (*entity.Banner, error) {
 	query := fmt.Sprintf(`SELECT banner.id,
        is_active,
@@ -150,6 +177,8 @@ GROUP BY banner.id, c.content_id`,
 	if err != nil {
 		return nil, err
 	}
+
+	defer rows.Close()
 
 	type Row struct {
 		ID        int    `db:"id"`
@@ -206,6 +235,8 @@ GROUP BY banner.id, c.content_id
 	if err != nil {
 		return nil, err
 	}
+
+	defer dbRows.Close()
 
 	type Row struct {
 		ID        int    `db:"id"`
@@ -328,6 +359,10 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 
 	defer tx.Rollback()
 
+	if err != nil {
+		return err
+	}
+
 	// update some fields in banner table
 	setQuery := fmt.Sprintf("is_active = %v, updated_at = now()", updateModel.IsActive)
 
@@ -396,15 +431,17 @@ func (r *Repo) UpdateBanner(ctx context.Context, id int, updateModel entity.Bann
 }
 
 func (r *Repo) DeleteBanner(ctx context.Context, id int) (*entity.Banner, error) {
-	row, err := r.DB.QueryxContext(ctx, "DELETE FROM banner WHERE id = $1 RETURNING *", id)
+	rows, err := r.DB.QueryxContext(ctx, "DELETE FROM banner WHERE id = $1 RETURNING *", id)
 	if err != nil {
 		return nil, err
 	}
 
+	defer rows.Close()
+
 	var banner entity.Banner
 
-	if row.Next() {
-		if err = row.StructScan(&banner); err != nil {
+	if rows.Next() {
+		if err = rows.StructScan(&banner); err != nil {
 			return nil, err
 		}
 	}

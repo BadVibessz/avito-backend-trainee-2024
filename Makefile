@@ -7,11 +7,8 @@ export TEST_DOCKER_PORT=5433
 
 export DOCKER_IMAGE_NAME=avito_trainee_image
 
-
-docker.up:
-	docker run --rm -d -p 5432:5432 --name avito_trainee_postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=avito-trainee postgres
-	docker compose up -d
-
+run:
+	docker compose up
 
 test.integration:
 	docker run --rm -d -p $$TEST_DOCKER_PORT:5432 --name $$TEST_CONTAINER_NAME -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=test postgres

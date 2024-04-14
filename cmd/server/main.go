@@ -1,29 +1,28 @@
 package main
 
 import (
-	"avito-backend-trainee-2024/internal/config"
-	"avito-backend-trainee-2024/pkg/hasher"
-	gocache "github.com/patrickmn/go-cache"
-	"time"
-
-	router "avito-backend-trainee-2024/pkg/route"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-playground/validator/v10"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
+	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	chimiddlewares "github.com/go-chi/chi/v5/middleware"
+	gocache "github.com/patrickmn/go-cache"
+	httpswagger "github.com/swaggo/http-swagger"
+
+	router "avito-backend-trainee-2024/pkg/route"
 
 	bannerrepo "avito-backend-trainee-2024/internal/repository/postgres/banner"
 	featurerepo "avito-backend-trainee-2024/internal/repository/postgres/feature"
@@ -35,13 +34,15 @@ import (
 
 	midlewares "avito-backend-trainee-2024/internal/handler/middleware"
 
+	authhandler "avito-backend-trainee-2024/internal/handler/auth"
 	adminbannerhandler "avito-backend-trainee-2024/internal/handler/banner/admin"
 	userbannerhandler "avito-backend-trainee-2024/internal/handler/banner/user"
 
-	authhandler "avito-backend-trainee-2024/internal/handler/auth"
-	httpswagger "github.com/swaggo/http-swagger"
+	"avito-backend-trainee-2024/internal/config"
+	"avito-backend-trainee-2024/pkg/hasher"
 
 	_ "avito-backend-trainee-2024/docs"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -73,7 +74,7 @@ func initConfig() (*config.Config, error) {
 
 	conf.Jwt.Secret = viper.GetString("JWT_SECRET")
 	if conf.Jwt.Secret == "" {
-		return nil, errors.New("JWT_SECRET env variable not set")
+		return nil, ErrJwtEnvVarNotSet
 	}
 
 	return &conf, nil
@@ -82,7 +83,6 @@ func initConfig() (*config.Config, error) {
 func main() {
 	logger := logrus.New()
 	valid := validator.New(validator.WithRequiredStructEnabled())
-	cache := gocache.New(5*time.Minute, 10*time.Minute)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -91,14 +91,34 @@ func main() {
 		logger.Fatalf("error occurred initializing config: %v", err)
 	}
 
-	conn, err := sql.Open("pgx", conf.Postgres.ConnectionURL())
-	if err != nil {
-		logger.Fatalf("cannot open database connection with connection string: %v, err: %v", conf.Postgres.ConnectionURL(), err)
+	cache := gocache.New(time.Duration(conf.Cache.Expiration)*time.Minute, time.Duration(conf.Cache.CleanupInterval)*time.Minute)
+
+	var conn *sql.DB
+
+	var db *sqlx.DB
+
+	// try to connect to db
+	for i := 0; i < conf.Postgres.Retries; i++ {
+		conn, err = sql.Open("pgx", conf.Postgres.ConnectionURL())
+		if err != nil {
+			logger.Fatalf("cannot open database connection with connection string: %v, err: %v", conf.Postgres.ConnectionURL(), err)
+		} else {
+			db = sqlx.NewDb(conn, "postgres")
+
+			if err = db.Ping(); err != nil {
+				logger.Errorf("can't ping database: %v\nconnection string: %v", err, conf.Postgres.ConnectionURL())
+				logger.Infof("retrying in %v sec...", conf.Postgres.Interval)
+				logger.Infof("retry %v of %v", i+1, conf.Postgres.Retries)
+
+				time.Sleep(time.Duration(conf.Postgres.Interval) * time.Second)
+			} else {
+				err = nil
+				break
+			}
+		}
 	}
 
-	db := sqlx.NewDb(conn, "postgres")
-
-	if err = db.Ping(); err != nil {
+	if err != nil {
 		logger.Fatalf("can't ping database: %v", err)
 	}
 
@@ -114,7 +134,7 @@ func main() {
 	adminAuthMiddleware := midlewares.AdminAuthorization(logger)
 	cacheMiddleware := midlewares.InMemUserBannerCache(cache, logger)
 
-	authHandler := authhandler.New(authService, conf.Jwt, logger, valid)
+	authHandler := authhandler.New(authService, conf.Jwt, logger, valid, authMiddleware, adminAuthMiddleware)
 	userBannerHandler := userbannerhandler.New(bannerService, logger, valid, authMiddleware, cacheMiddleware)
 	adminBannerHandler := adminbannerhandler.New(bannerService, logger, valid, authMiddleware, adminAuthMiddleware)
 
